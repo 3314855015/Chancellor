@@ -131,7 +131,7 @@ export const useAuthStore = defineStore('auth', () => {
       if (isValid) {
         const response = await getCurrentUser()
         if (response.success) {
-          setUser(response.data.user)
+          setUser(response.data.user as any)
           setToken(savedToken)
           return true
         }

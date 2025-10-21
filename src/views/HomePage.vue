@@ -118,14 +118,14 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+// import { useRouter } from 'vue-router'
 import WelcomeSection from '@/components/WelcomeSection.vue'
 import LoginModal from '@/components/Auth/LoginModal.vue'
 import RegisterModal from '@/components/Auth/RegisterModal.vue'
 import Notification from '@/components/UI/Notification.vue'
 import { useNotification } from '@/composables/useNotification'
 
-const router = useRouter()
+// const router = useRouter()
 
 // 通知系统
 const { notification, hideNotification } = useNotification()

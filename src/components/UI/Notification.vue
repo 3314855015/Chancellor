@@ -32,7 +32,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<Emits>()
 
 const visible = ref(props.visible)
-let timer: NodeJS.Timeout | null = null
+let timer: number | null = null
 
 const close = () => {
   if (timer) {

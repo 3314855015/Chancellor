@@ -8,7 +8,8 @@ export const useAppStore = defineStore('app', {
   state: () => ({
     appTitle: '上赛博朝廷，享智能招聘！',
     theme: 'light' as 'light' | 'dark',
-    version: '1.0.0'
+    version: '1.0.0',
+    isLoading: false
   }),
   
   getters: {

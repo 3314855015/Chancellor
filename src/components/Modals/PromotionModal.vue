@@ -34,9 +34,9 @@ interface Props {
 
 defineProps<Props>()
 
-const emit = defineEmits<{
-  close: []
-}>()
+// const emit = defineEmits<{
+//   close: []
+// }>()
 
 const generatedKey = ref('')
 

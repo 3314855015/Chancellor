@@ -1,7 +1,7 @@
 <template>
   <button 
     class="btn" 
-    :class="[variant, size, { disabled, loading }]"
+    :class="[variant, size, { 'disabled': disabled, 'loading': loading }]"
     :disabled="disabled || loading"
     @click="onClick"
   >
@@ -23,7 +23,7 @@ interface Props {
   loading?: boolean
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   variant: 'primary',
   size: 'medium',
   disabled: false,
@@ -35,7 +35,8 @@ const emit = defineEmits<{
 }>()
 
 const onClick = (event: MouseEvent) => {
-  if (!disabled && !loading) {
+  // 使用props属性
+  if (!props.disabled && !props.loading) {
     emit('click', event)
   }
 }

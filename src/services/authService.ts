@@ -2,7 +2,7 @@
 import type { LoginRequest, RegisterRequest, AuthResponse } from '@/types/auth'
 
 // 模拟API基础URL
-const API_BASE_URL = 'http://localhost:3000/api'
+// const API_BASE_URL = 'http://localhost:3000/api'
 
 // 模拟网络请求延迟
 const simulateNetworkDelay = (ms: number = 1000) => {
@@ -43,7 +43,7 @@ export const login = async (credentials: LoginRequest): Promise<AuthResponse> =>
         id: user.id,
         username: user.username,
         email: user.email,
-        role: user.role
+        role: user.role as any
       },
       token: mockToken
     }
@@ -69,7 +69,7 @@ export const register = async (userData: RegisterRequest): Promise<AuthResponse>
   }
   
   // 强制设置为监生身份（学生）
-  const userRole: UserRole = 'student'
+  const userRole = 'student' as const
   
   // 创建新用户
   const newUser = {
