@@ -1,9 +1,8 @@
 <template>
   <div class="admin-page">
-    <Header 
+    <AdminNav 
       title="👑 管理员面板" 
       subtitle="生成密钥 · 管理系统安全"
-      :navigation="navigation"
     />
     
     <AdminWelcome />
@@ -91,16 +90,13 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import Header from '@/components/Header.vue'
+import AdminNav from '@/components/AdminNav.vue'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import Footer from '@/components/Footer.vue'
 import AdminWelcome from '@/components/AdminWelcome.vue'
 
-const navigation = [
-  { icon: '🏠', label: '首页', path: '/' },
-  { icon: '📖', label: '关于', path: '/about' }
-]
+
 
 const enterpriseKey = ref('')
 const examinerKey = ref('')
@@ -142,7 +138,7 @@ const securitySettings = () => {
 .main-content {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 30px 20px;
+  padding: 20px;
 }
 
 .section {

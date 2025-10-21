@@ -1,9 +1,8 @@
 <template>
   <div class="enterprise-page">
-    <Header 
+    <EnterpriseNav 
       title="🏢 州牧面板" 
       subtitle="企业匹配 · 人才对接 · 点数使用"
-      :navigation="navigation"
     />
     
     <EnterpriseWelcome />
@@ -123,16 +122,13 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import Header from '@/components/Header.vue'
+import EnterpriseNav from '@/components/EnterpriseNav.vue'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import Footer from '@/components/Footer.vue'
 import EnterpriseWelcome from '@/components/EnterpriseWelcome.vue'
 
-const navigation = [
-  { icon: '🏠', label: '首页', path: '/' },
-  { icon: '📖', label: '关于', path: '/about' }
-]
+
 
 const showBuyPoints = ref(false)
 const selectedOption = ref(10)
@@ -214,7 +210,7 @@ const viewPointsHistory = () => {
 .main-content {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 30px 20px;
+  padding: 20px;
 }
 
 .section {

@@ -1,9 +1,8 @@
 <template>
   <div class="student-page">
-    <Header 
+    <StudentNav 
       title="🎓 监生面板" 
       subtitle="接取任务 · 提升能力 · 寻求就业"
-      :navigation="navigation"
     />
     
     <StudentWelcome />
@@ -136,16 +135,13 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import Header from '@/components/Header.vue'
+import StudentNav from '@/components/StudentNav.vue'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import Footer from '@/components/Footer.vue'
 import StudentWelcome from '@/components/StudentWelcome.vue'
 
-const navigation = [
-  { icon: '🏠', label: '首页', path: '/' },
-  { icon: '📖', label: '关于', path: '/about' }
-]
+
 
 const activeTab = ref('available')
 
@@ -224,7 +220,7 @@ const applyOpportunity = (opportunity: any) => {
 .main-content {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 30px 20px;
+  padding: 20px;
 }
 
 .section {

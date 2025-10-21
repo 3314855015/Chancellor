@@ -1,9 +1,8 @@
 <template>
   <div class="examiner-page">
-    <Header 
+    <ExaminerNav 
       title="📚 考官面板" 
       subtitle="发布任务 · 评审学生 · 分配点数"
-      :navigation="navigation"
     />
     
     <ExaminerWelcome />
@@ -86,16 +85,13 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import Header from '@/components/Header.vue'
+import ExaminerNav from '@/components/ExaminerNav.vue'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import Footer from '@/components/Footer.vue'
 import ExaminerWelcome from '@/components/ExaminerWelcome.vue'
 
-const navigation = [
-  { icon: '🏠', label: '首页', path: '/' },
-  { icon: '📖', label: '关于', path: '/about' }
-]
+
 
 const showCreateTask = ref(false)
 const teacherKey = ref('')
@@ -157,7 +153,7 @@ const assignPoints = (student: any) => {
 .main-content {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 30px 20px;
+  padding: 20px;
 }
 
 .section {
