@@ -20,7 +20,7 @@
             </template>
             <p>用于企业身份认证和注册</p>
             <template #footer>
-              <Button label="生成请帖" @click="generateEnterpriseKey" />
+              <Button label="请帖" @click="generateEnterpriseKey" />
               <div v-if="enterpriseKey" class="key-display">
                 <p>生成的密钥：{{ enterpriseKey }}</p>
                 <Button label="复制" size="small" @click="copyKey(enterpriseKey)" />
@@ -35,7 +35,7 @@
             </template>
             <p>用于教师身份认证和注册</p>
             <template #footer>
-              <Button label="生成升官" @click="generateExaminerKey" />
+              <Button label="升官" @click="generateExaminerKey" />
               <div v-if="examinerKey" class="key-display">
                 <p>生成的密钥：{{ examinerKey }}</p>
                 <Button label="复制" size="small" @click="copyKey(examinerKey)" />

@@ -2,7 +2,7 @@
   <div class="admin-welcome">
     <div class="welcome-content">
       <h1 class="welcome-title">皇上，您吉祥~</h1>
-      <p class="welcome-subtitle">又是万众瞩目的科举，您要邀请州牧还是任命考官？</p>
+      <p class="welcome-subtitle">又是万众瞩目的科举，您要邀请州牧，还是任命考官？</p>
       <div class="welcome-actions">
         <button class="welcome-btn primary" @click="inviteEnterprise">
           📨 邀请州牧

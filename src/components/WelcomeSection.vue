@@ -2,7 +2,7 @@
   <div class="welcome-section">
     <div class="welcome-content">
       <h1 class="welcome-title">{{ appStore.appTitle }}</h1>
-      <p class="welcome-subtitle">Chancellor，一款智能招聘平台！</p>
+      <p class="welcome-subtitle">Chancellor，一站式智能招聘平台！</p>
       <div class="theme-info">
         <span class="theme-label">当前主题：</span>
         <span class="theme-value">{{ appStore.theme === 'light' ? '浅色' : '深色' }}</span>

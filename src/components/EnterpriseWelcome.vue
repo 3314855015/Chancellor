@@ -1,7 +1,7 @@
 <template>
   <div class="enterprise-welcome">
     <div class="welcome-content">
-      <h1 class="welcome-title">招新，不可怕</h1>
+      <h1 class="welcome-title">招新，不可怕！</h1>
       <p class="welcome-subtitle">招新是凉爽的夏夜，可供人无忧的安眠~</p>
       <div class="welcome-actions">
         <button class="welcome-btn primary" @click="startRecruiting">
