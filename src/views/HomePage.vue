@@ -95,7 +95,10 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import WelcomeSection from '@/components/WelcomeSection.vue'
+
+const router = useRouter()
 
 const abilityTooltip = ref('')
 const userAvatar = ref('')
@@ -110,11 +113,11 @@ const abilities = ref([
 ])
 
 const handleLogin = () => {
-  alert('跳转到登录页面')
+  router.push('/login')
 }
 
 const handleRegister = () => {
-  alert('跳转到注册页面')
+  router.push('/register')
 }
 
 const showAbilityTooltip = (abilityName: string) => {
