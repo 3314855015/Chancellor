@@ -8,10 +8,11 @@
       </div>
       <div class="cute-nav">
         <div class="user-actions">
-          <button class="login-btn" @click="showLoginModal">登录</button>
-          <button class="register-btn" @click="showRegisterModal">注册</button>
-          <div class="user-avatar" v-if="userAvatar">
-            <img :src="userAvatar" alt="用户头像" />
+          <button class="login-btn" @click="showLoginModal" v-if="!isAuthenticated">登录</button>
+          <button class="register-btn" @click="showRegisterModal" v-if="!isAuthenticated">注册</button>
+          <div class="user-info" v-if="isAuthenticated">
+            <span class="welcome-text">欢迎，{{ user?.username }}</span>
+            <button class="logout-btn" @click="handleLogout">退出</button>
           </div>
         </div>
       </div>
@@ -52,57 +53,44 @@
     
     <!-- 主要内容区域 -->
     <div class="cute-main">
-      <!-- 角色选择卡片 -->
-      <div class="role-section">
-        <h2 class="cute-subtitle">🎭 选择您的身份角色</h2>
-        <div class="role-grid">
-          <div class="cute-card" @click="$router.push('/admin')">
-            <div class="cute-icon">👑</div>
-            <h3>管理员</h3>
-            <p>生成企业密钥【请帖】和考官密钥【升官】</p>
-            <div class="cute-badge">权限最高</div>
-          </div>
-          
-          <div class="cute-card" @click="$router.push('/examiner')">
-            <div class="cute-icon">📚</div>
-            <h3>考官</h3>
-            <p>发布任务、评审学生、分配能力点数</p>
-            <div class="cute-badge">教师角色</div>
-          </div>
-          
-          <div class="cute-card" @click="$router.push('/enterprise')">
-            <div class="cute-icon">🏢</div>
-            <h3>州牧</h3>
-            <p>企业匹配学生、使用点数进行人才对接</p>
-            <div class="cute-badge">企业角色</div>
-          </div>
-          
-          <div class="cute-card" @click="$router.push('/student')">
-            <div class="cute-icon">🎓</div>
-            <h3>监生</h3>
-            <p>接取任务、提升能力、寻求就业机会</p>
-            <div class="cute-badge">学生角色</div>
-          </div>
+      <!-- 登录提示区域 -->
+      <div class="login-prompt" v-if="!isAuthenticated">
+        <h2 class="cute-subtitle">🚀 开始您的智能教育与就业之旅</h2>
+        <p class="prompt-description">请先登录您的账户，系统将根据您的身份自动跳转到相应页面</p>
+        <div class="prompt-actions">
+          <button class="primary-btn" @click="showLoginModal">立即登录</button>
+          <button class="secondary-btn" @click="showRegisterModal">注册新账户</button>
         </div>
       </div>
 
-      <!-- 能力点展示 -->
-      <div class="ability-section">
-        <h2 class="cute-subtitle">🌟 能力点数系统</h2>
-        <div class="ability-grid">
-          <div class="ability-item" v-for="ability in abilities" :key="ability.name"
-               @mouseenter="showAbilityTooltip(ability.name)" @mouseleave="hideAbilityTooltip">
-            <div class="ability-icon">{{ ability.icon }}</div>
-            <div class="ability-info">
-              <div class="ability-name">{{ ability.name }}</div>
-              <div class="ability-dots">
-                <span v-for="n in 10" :key="n" 
-                      :class="['ability-dot', n <= ability.value ? 'active' : '']"></span>
+      <!-- 已登录用户信息展示 -->
+      <div class="user-dashboard" v-if="isAuthenticated">
+        <h2 class="cute-subtitle">🎯 欢迎回来，{{ user?.username }}</h2>
+        <div class="user-role-info">
+          <div class="role-badge" :class="user?.role">
+            {{ getRoleDisplayName(user?.role) }}
+          </div>
+          <p class="role-description">{{ getRoleDescription(user?.role) }}</p>
+        </div>
+        
+        <!-- 能力点展示 -->
+        <div class="ability-section">
+          <h3 class="ability-title">🌟 您的能力点数</h3>
+          <div class="ability-grid">
+            <div class="ability-item" v-for="ability in userAbilities" :key="ability.name"
+                 @mouseenter="showAbilityTooltip(ability.name)" @mouseleave="hideAbilityTooltip">
+              <div class="ability-icon">{{ ability.icon }}</div>
+              <div class="ability-info">
+                <div class="ability-name">{{ ability.name }}</div>
+                <div class="ability-dots">
+                  <span v-for="n in 10" :key="n" 
+                        :class="['ability-dot', n <= ability.value ? 'active' : '']"></span>
+                </div>
+                <div class="ability-value">{{ ability.value }}/10</div>
               </div>
-              <div class="ability-value">{{ ability.value }}/10</div>
-            </div>
-            <div v-if="abilityTooltip === ability.name" class="ability-tooltip">
-              {{ ability.description }}
+              <div v-if="abilityTooltip === ability.name" class="ability-tooltip">
+                {{ ability.description }}
+              </div>
             </div>
           </div>
         </div>
@@ -117,15 +105,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-// import { useRouter } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import WelcomeSection from '@/components/WelcomeSection.vue'
 import LoginModal from '@/components/Auth/LoginModal.vue'
 import RegisterModal from '@/components/Auth/RegisterModal.vue'
 import Notification from '@/components/UI/Notification.vue'
 import { useNotification } from '@/composables/useNotification'
+import { useAuthStore } from '@/stores/authStore'
 
-// const router = useRouter()
+const router = useRouter()
+const authStore = useAuthStore()
 
 // 通知系统
 const { notification, hideNotification } = useNotification()
@@ -135,16 +125,46 @@ const showLogin = ref(false)
 const showRegister = ref(false)
 
 const abilityTooltip = ref('')
-const userAvatar = ref('')
 
-const abilities = ref([
-  { name: '技术能力', icon: '💻', value: 7, description: '编程、技术应用等能力' },
-  { name: '沟通能力', icon: '💬', value: 8, description: '表达、交流、协作能力' },
-  { name: '团队协作', icon: '👥', value: 6, description: '团队合作和协调能力' },
-  { name: '学习能力', icon: '📚', value: 9, description: '快速学习和适应能力' },
-  { name: '创造力', icon: '🎨', value: 7, description: '创新思维和解决问题能力' },
-  { name: '领导力', icon: '⭐', value: 5, description: '组织和领导团队能力' }
-])
+// 认证状态
+const isAuthenticated = computed(() => authStore.isAuthenticated)
+const user = computed(() => authStore.user)
+
+// 用户能力数据
+const userAbilities = computed(() => {
+  const abilities = authStore.abilities
+  return [
+    { name: '前端能力', icon: '💻', value: abilities?.frontendPoints || 0, description: '前端开发技术能力' },
+    { name: '安卓能力', icon: '📱', value: abilities?.androidPoints || 0, description: '安卓应用开发能力' },
+    { name: '后端能力', icon: '⚙️', value: abilities?.backendPoints || 0, description: '后端服务开发能力' },
+    { name: 'AI能力', icon: '🤖', value: abilities?.aiPoints || 0, description: '人工智能技术能力' },
+    { name: '沟通能力', icon: '💬', value: abilities?.communicationPoints || 0, description: '表达、交流、协作能力' },
+    { name: '创造力', icon: '🎨', value: abilities?.creativityPoints || 0, description: '创新思维和解决问题能力' },
+    { name: '领导力', icon: '⭐', value: abilities?.leadershipPoints || 0, description: '组织和领导团队能力' }
+  ]
+})
+
+// 角色显示名称映射
+const getRoleDisplayName = (role: string | undefined) => {
+  switch (role) {
+    case 'admin': return '管理员'
+    case 'examiner': return '考官'
+    case 'enterprise': return '州牧'
+    case 'student': return '监生'
+    default: return '用户'
+  }
+}
+
+// 角色描述映射
+const getRoleDescription = (role: string | undefined) => {
+  switch (role) {
+    case 'admin': return '生成企业密钥【请帖】和考官密钥【升官】'
+    case 'examiner': return '发布任务、评审学生、分配能力点数'
+    case 'enterprise': return '企业匹配学生、使用点数进行人才对接'
+    case 'student': return '接取任务、提升能力、寻求就业机会'
+    default: return '智能教育与就业平台用户'
+  }
+}
 
 // 模态框控制函数
 const showLoginModal = () => {
@@ -158,9 +178,14 @@ const showRegisterModal = () => {
 }
 
 // 处理登录成功
-const handleLoginSuccess = () => {
+const handleLoginSuccess = async () => {
   console.log('登录成功')
-  // 这里可以添加登录成功后的逻辑，比如更新用户状态等
+  
+  // 等待Pinia状态更新完成
+  await new Promise(resolve => setTimeout(resolve, 100))
+  
+  // 根据用户角色自动跳转到相应页面
+  redirectToRolePage()
 }
 
 // 处理注册成功
@@ -180,6 +205,39 @@ const handleSwitchToLogin = () => {
   showLoginModal()
 }
 
+// 处理退出登录
+const handleLogout = async () => {
+  try {
+    await authStore.userLogout()
+    // 退出后刷新页面
+    window.location.reload()
+  } catch (error) {
+    console.error('退出登录失败:', error)
+  }
+}
+
+// 根据用户角色跳转到相应页面
+const redirectToRolePage = () => {
+  if (!user.value) return
+  
+  switch (user.value.role) {
+    case 'admin':
+      router.push('/admin')
+      break
+    case 'examiner':
+      router.push('/examiner')
+      break
+    case 'enterprise':
+      router.push('/enterprise')
+      break
+    case 'student':
+      router.push('/student')
+      break
+    default:
+      router.push('/')
+  }
+}
+
 const showAbilityTooltip = (abilityName: string) => {
   abilityTooltip.value = abilityName
 }
@@ -187,6 +245,16 @@ const showAbilityTooltip = (abilityName: string) => {
 const hideAbilityTooltip = () => {
   abilityTooltip.value = ''
 }
+
+// 组件挂载时检查认证状态
+onMounted(async () => {
+  await authStore.initializeAuth()
+  
+  // 如果已登录，根据角色跳转
+  if (isAuthenticated.value && user.value) {
+    redirectToRolePage()
+  }
+})
 </script>
 
 <style scoped>
@@ -731,6 +799,158 @@ const hideAbilityTooltip = () => {
   z-index: 10;
 }
 
+/* 用户信息样式 */
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  color: white;
+}
+
+.welcome-text {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.logout-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  border-radius: 15px;
+  transition: all 0.3s ease;
+}
+
+.logout-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+/* 登录提示区域 */
+.login-prompt {
+  text-align: center;
+  background: linear-gradient(135deg, #F0F8FF 0%, #E6F3FF 100%);
+  border: 2px solid #87CEEB;
+  border-radius: 20px;
+  padding: 40px 30px;
+  margin: 30px 0;
+  box-shadow: 0 8px 25px rgba(135, 206, 235, 0.2);
+}
+
+.prompt-description {
+  color: #5d4037;
+  font-size: 1.1rem;
+  margin: 15px 0 25px;
+  line-height: 1.5;
+}
+
+.prompt-actions {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.primary-btn {
+  background: #4682B4;
+  border: 1px solid transparent;
+  color: white;
+  padding: 12px 24px;
+  font-family: inherit;
+  font-size: 1rem;
+  cursor: pointer;
+  border-radius: 20px;
+  transition: all 0.3s ease;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(70, 130, 180, 0.2);
+}
+
+.primary-btn:hover {
+  background: #5F9EA0;
+  transform: translateY(-3px);
+  box-shadow: 0 4px 15px rgba(70, 130, 180, 0.3);
+}
+
+.secondary-btn {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #4682B4;
+  color: #4682B4;
+  padding: 12px 24px;
+  font-family: inherit;
+  font-size: 1rem;
+  cursor: pointer;
+  border-radius: 20px;
+  transition: all 0.3s ease;
+  font-weight: 600;
+}
+
+.secondary-btn:hover {
+  background: white;
+  transform: translateY(-3px);
+  box-shadow: 0 4px 15px rgba(70, 130, 180, 0.2);
+}
+
+/* 用户仪表板 */
+.user-dashboard {
+  background: white;
+  border: 2px solid transparent;
+  border-radius: 20px;
+  padding: 30px;
+  margin: 30px 0;
+  box-shadow: 0 8px 25px rgba(135, 206, 235, 0.1);
+}
+
+.user-role-info {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.role-badge {
+  display: inline-block;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 1rem;
+  margin-bottom: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.role-badge.admin {
+  background: linear-gradient(135deg, #FF6B6B 0%, #FF8E8E 100%);
+  color: white;
+}
+
+.role-badge.examiner {
+  background: linear-gradient(135deg, #4ECDC4 0%, #6EE7B7 100%);
+  color: white;
+}
+
+.role-badge.enterprise {
+  background: linear-gradient(135deg, #45B7D1 0%, #96C8FB 100%);
+  color: white;
+}
+
+.role-badge.student {
+  background: linear-gradient(135deg, #A8E6CF 0%, #DCEDC1 100%);
+  color: #5d4037;
+}
+
+.role-description {
+  color: #5d4037;
+  font-size: 1rem;
+  margin: 0;
+}
+
+.ability-title {
+  text-align: center;
+  font-size: 1.3rem;
+  color: #4682B4;
+  margin-bottom: 20px;
+}
+
 .cute-footer {
   background: #87CEEB;
   border-top: none;
@@ -749,6 +969,21 @@ const hideAbilityTooltip = () => {
     gap: 15px;
   }
   
+  .user-info {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .prompt-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .primary-btn, .secondary-btn {
+    width: 100%;
+    max-width: 200px;
+  }
+  
   .role-grid {
     grid-template-columns: 1fr;
   }
@@ -759,6 +994,16 @@ const hideAbilityTooltip = () => {
   
   .cute-main {
     padding: 20px 15px;
+  }
+  
+  .login-prompt {
+    padding: 30px 20px;
+    margin: 20px 0;
+  }
+  
+  .user-dashboard {
+    padding: 20px 15px;
+    margin: 20px 0;
   }
 }
 </style>
