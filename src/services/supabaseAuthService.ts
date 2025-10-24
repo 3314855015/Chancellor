@@ -346,46 +346,41 @@ export const getCurrentUser = async (userId: string) => {
  */
 export const validateKey = async (keyValue: string): Promise<KeyResponse> => {
   try {
-    const { data: key, error } = await supabase
-      .from('invitation_keys')
-      .select('*')
-      .eq('key_value', keyValue)
-      .single()
+    // 使用RPC函数验证密钥，绕过RLS限制
+    const { data: validationResult, error } = await supabase
+      .rpc('validate_invitation_key', {
+        p_key_value: keyValue
+      })
 
     if (error) {
-      throw new Error('密钥不存在')
+      console.error('RPC验证密钥失败:', error)
+      throw new Error('密钥验证失败')
     }
 
-    if (key.used) {
-      throw new Error('密钥已被使用')
+    if (!validationResult || !validationResult.success) {
+      throw new Error(validationResult?.message || '密钥验证失败')
     }
 
-    if (new Date(key.expires_at) < new Date()) {
-      throw new Error('密钥已过期')
-    }
-
-    if (key.current_uses >= key.max_uses) {
-      throw new Error('密钥使用次数已达上限')
-    }
-
+    const keyData = validationResult.key
+    
     return {
       success: true,
       message: '密钥验证成功',
       data: {
         key: {
-          id: key.id,
-          keyValue: key.key_value,
-          keyType: key.key_type,
-          creatorId: key.creator_id,
-          used: key.used,
-          usedBy: key.used_by || undefined,
-          usedAt: key.used_at || undefined,
-          expiresAt: key.expires_at,
-          maxUses: key.max_uses,
-          currentUses: key.current_uses,
-          description: key.description || undefined,
-          createdAt: key.created_at,
-          updatedAt: key.updated_at
+          id: keyData.id,
+          keyValue: keyData.key_value,
+          keyType: keyData.key_type,
+          creatorId: keyData.creator_id,
+          used: keyData.used,
+          usedBy: keyData.used_by || undefined,
+          usedAt: keyData.used_at || undefined,
+          expiresAt: keyData.expires_at,
+          maxUses: keyData.max_uses,
+          currentUses: keyData.current_uses,
+          description: keyData.description || undefined,
+          createdAt: keyData.created_at,
+          updatedAt: keyData.updated_at
         }
       }
     }
@@ -406,62 +401,33 @@ export const validateKey = async (keyValue: string): Promise<KeyResponse> => {
  */
 export const useKey = async (request: UseKeyRequest, currentUserId: string): Promise<AuthResponse> => {
   try {
-    // 验证密钥
-    const keyResponse = await validateKey(request.keyValue)
-    if (!keyResponse.success) {
-      throw new Error(keyResponse.message)
-    }
-
-    const key = keyResponse.data.key
     const targetUserId = request.targetUserId || currentUserId
 
-    // 根据密钥类型升级权限
-    let newRole: 'examiner' | 'enterprise'
-    
-    switch (key.keyType) {
-      case 'promotion':
-        newRole = 'examiner'
-        break
-      case 'invitation':
-        newRole = 'enterprise'
-        break
-      case 'teacher':
-        // 教师密钥用于关联学生，不改变角色
-        // 这里可以添加教师关联逻辑
-        throw new Error('教师密钥功能暂未实现')
-      default:
-        throw new Error('无效的密钥类型')
+    // 使用RPC函数使用密钥，绕过RLS限制
+    const { data: useKeyResult, error } = await supabase
+      .rpc('use_invitation_key', {
+        p_key_value: request.keyValue,
+        p_user_id: targetUserId
+      })
+
+    if (error) {
+      console.error('RPC使用密钥失败:', error)
+      throw new Error('权限升级失败')
     }
 
-    // 更新用户角色
-    const { data: updatedUser, error: updateError } = await supabase
+    if (!useKeyResult || !useKeyResult.success) {
+      throw new Error(useKeyResult?.message || '权限升级失败')
+    }
+
+    // 获取更新后的用户信息
+    const { data: updatedUser, error: userError } = await supabase
       .from('users')
-      .update({ 
-        role: newRole,
-        updated_at: new Date().toISOString()
-      })
+      .select('*')
       .eq('id', targetUserId)
-      .select()
       .single()
 
-    if (updateError) {
-      throw new Error(updateError.message)
-    }
-
-    // 标记密钥为已使用
-    const { error: keyError } = await supabase
-      .from('invitation_keys')
-      .update({
-        used: true,
-        used_by: targetUserId,
-        used_at: new Date().toISOString(),
-        current_uses: key.currentUses + 1,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', key.id)
-
-    if (keyError) {
-      throw new Error(keyError.message)
+    if (userError) {
+      throw new Error(userError.message)
     }
 
     // 获取用户能力数据
@@ -471,6 +437,8 @@ export const useKey = async (request: UseKeyRequest, currentUserId: string): Pro
       .eq('user_id', targetUserId)
       .single()
 
+    const newRole = useKeyResult.new_role
+    
     return {
       success: true,
       message: `权限升级成功，您现在是${newRole === 'examiner' ? '考官' : '州牧（企业）'}`,

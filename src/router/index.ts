@@ -28,6 +28,14 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/keys',
+    name: 'AdminKeys',
+    component: () => import('@/views/AdminKeyManagement.vue'),
+    meta: {
+      title: '密钥管理'
+    }
+  },
+  {
     path: '/examiner',
     name: 'Examiner',
     component: () => import('@/views/ExaminerPage.vue'),

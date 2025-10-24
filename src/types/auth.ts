@@ -53,7 +53,7 @@ export interface RegisterRequest {
 
 // 密钥相关接口
 export interface InvitationKey {
-  id: number
+  id: string
   keyValue: string
   keyType: 'invitation' | 'promotion' | 'teacher'
   creatorId: string
@@ -98,7 +98,8 @@ export interface KeyResponse {
   success: boolean
   message: string
   data: {
-    key: InvitationKey
+    key?: InvitationKey
+    keys?: InvitationKey[]
   }
 }
 

@@ -1,6 +1,6 @@
-// 认证状态管理
+// 认证状态管理 - 使用统一的认证服务层
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import type { 
   User, 
   UserState, 
@@ -10,25 +10,19 @@ import type {
   UseKeyRequest,
   GenerateKeyRequest 
 } from '@/types/auth'
-import { 
-  login, 
-  register, 
-  logout, 
-  getCurrentUser, 
-  validateToken,
-  useKey,
-  generateKey,
-  validateKey 
-} from '@/services/supabaseAuthService'
+import authService from '@/services/authService'
+import apiService, { authAPI } from '@/services/apiService'
 
 export const useAuthStore = defineStore('auth', () => {
   // 状态
-  const isAuthenticated = ref(false)
-  const user = ref<User | null>(null)
-  const token = ref<string | null>(null)
-  const abilities = ref<UserAbilities | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
+
+  // 计算属性 - 从认证服务获取状态
+  const isAuthenticated = computed(() => authService.isAuthenticated())
+  const user = computed(() => authService.getCurrentUser())
+  const token = computed(() => authService.getToken())
+  const abilities = computed(() => authService.getUserAbilities())
 
   // 获取状态
   const getState = (): UserState => ({
@@ -55,40 +49,15 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = value
   }
 
-  // 设置用户信息
-  const setUser = (userData: User | null) => {
-    user.value = userData
-    isAuthenticated.value = !!userData
-  }
-
-  // 设置token
-  const setToken = (newToken: string | null) => {
-    token.value = newToken
-    // 实际项目中应该将token存储到localStorage
-    if (newToken) {
-      localStorage.setItem('auth_token', newToken)
-    } else {
-      localStorage.removeItem('auth_token')
-    }
-  }
-
-  // 设置能力信息
-  const setAbilities = (abilitiesData: UserAbilities | null) => {
-    abilities.value = abilitiesData
-  }
-
   // 用户登录
   const userLogin = async (credentials: LoginRequest) => {
     setLoading(true)
     clearError()
     
     try {
-      const response = await login(credentials)
+      const response = await authService.login(credentials)
       
       if (response.success) {
-        setUser(response.data.user)
-        setToken(response.data.token)
-        setAbilities(response.data.abilities || null)
         return { success: true, message: response.message }
       } else {
         setError(response.message)
@@ -109,10 +78,9 @@ export const useAuthStore = defineStore('auth', () => {
     clearError()
     
     try {
-      const response = await register(userData)
+      const response = await authService.register(userData)
       
       if (response.success) {
-        // 注册成功后不自动登录，需要用户手动登录
         return { success: true, message: response.message }
       } else {
         setError(response.message)
@@ -132,10 +100,7 @@ export const useAuthStore = defineStore('auth', () => {
     setLoading(true)
     
     try {
-      await logout()
-      setUser(null)
-      setToken(null)
-      setAbilities(null)
+      await authService.logout()
       clearError()
     } catch (err) {
       console.error('登出失败:', err)
@@ -146,109 +111,41 @@ export const useAuthStore = defineStore('auth', () => {
 
   // 检查登录状态
   const checkAuthStatus = async () => {
-    const savedToken = localStorage.getItem('auth_token')
-    
-    if (!savedToken) {
-      return false
-    }
+    setLoading(true)
     
     try {
-      const isValid = await validateToken()
-      if (isValid) {
-        // 从token中提取用户ID
-        // 注意：这里需要根据实际的token格式来提取用户ID
-        // 由于我们使用的是Supabase认证，可能需要从JWT token中解析用户信息
-        // 暂时使用简单的用户ID存储方式
-        const userId = localStorage.getItem('user_id')
-        
-        if (userId) {
-          const response = await getCurrentUser(userId)
-          if (response.success && response.data.user) {
-            setUser(response.data.user)
-            setToken(savedToken)
-            setAbilities(response.data.abilities || null)
-            return true
-          }
-        }
-      }
+      const isAuthenticated = await authService.checkAuthStatus()
+      return isAuthenticated
     } catch (err) {
       console.error('检查登录状态失败:', err)
-    }
-    
-    // token无效，清除本地存储
-    setUser(null)
-    setToken(null)
-    setAbilities(null)
-    return false
-  }
-
-  // 使用密钥升级权限
-  const upgradeRole = async (request: UseKeyRequest) => {
-    setLoading(true)
-    clearError()
-    
-    if (!user.value) {
-      setError('请先登录')
-      setLoading(false)
-      return { success: false, message: '请先登录' }
-    }
-    
-    try {
-      const response = await useKey(request, user.value.id)
-      
-      if (response.success) {
-        setUser(response.data.user)
-        setAbilities(response.data.abilities || null)
-        return { success: true, message: response.message }
-      } else {
-        setError(response.message)
-        return { success: false, message: response.message }
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : '权限升级失败'
-      setError(message)
-      return { success: false, message }
+      return false
     } finally {
       setLoading(false)
     }
   }
 
-  // 生成密钥（管理员功能）
-  const createKey = async (request: GenerateKeyRequest) => {
-    setLoading(true)
-    clearError()
-    
-    if (!user.value || user.value.role !== 'admin') {
-      setError('只有管理员可以生成密钥')
-      setLoading(false)
-      return { success: false, message: '只有管理员可以生成密钥' }
-    }
-    
-    try {
-      const response = await generateKey(request, user.value.id)
-      
-      if (response.success) {
-        return { success: true, message: response.message, data: response.data }
-      } else {
-        setError(response.message)
-        return { success: false, message: response.message }
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : '密钥生成失败'
-      setError(message)
-      return { success: false, message }
-    } finally {
-      setLoading(false)
-    }
+  // 根据用户角色获取跳转路径
+  const getRoleRedirectPath = () => {
+    return authService.getRoleRedirectPath()
+  }
+
+  // 获取角色显示名称
+  const getRoleDisplayName = () => {
+    return authService.getRoleDisplayName()
+  }
+
+  // 获取角色描述
+  const getRoleDescription = () => {
+    return authService.getRoleDescription()
   }
 
   // 验证密钥
-  const verifyKey = async (keyValue: string) => {
+  const validateKey = async (keyValue: string) => {
     setLoading(true)
     clearError()
     
     try {
-      const response = await validateKey(keyValue)
+      const response = await authService.validateKey(keyValue)
       
       if (response.success) {
         return { success: true, message: response.message, data: response.data }
@@ -258,6 +155,32 @@ export const useAuthStore = defineStore('auth', () => {
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : '密钥验证失败'
+      setError(message)
+      return { success: false, message }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 使用密钥升级权限
+  const upgradeRole = async (request: UseKeyRequest) => {
+    setLoading(true)
+    clearError()
+    
+    try {
+      // 调用API服务进行密钥验证和权限升级
+      const response = await authAPI.upgradeRole(request)
+      
+      if (response.success) {
+        // 更新本地用户状态
+        await checkAuthStatus()
+        return { success: true, message: response.message }
+      } else {
+        setError(response.message)
+        return { success: false, message: response.message }
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '权限升级失败'
       setError(message)
       return { success: false, message }
     } finally {
@@ -286,16 +209,15 @@ export const useAuthStore = defineStore('auth', () => {
     setError,
     clearError,
     setLoading,
-    setUser,
-    setToken,
-    setAbilities,
     userLogin,
     userRegister,
     userLogout,
     checkAuthStatus,
+    getRoleRedirectPath,
+    getRoleDisplayName,
+    getRoleDescription,
+    validateKey,
     upgradeRole,
-    createKey,
-    verifyKey,
     initializeAuth
   }
 })
