@@ -11,8 +11,23 @@ import { useRouter } from 'vue-router'
 
 const router = useRouter()
 
-const goBack = () => {
-  router.push('/')
+const goBack = async () => {
+  try {
+    // 直接清空本地存储，避免触发任何通知系统
+    localStorage.removeItem('auth_token')
+    localStorage.removeItem('user_data')
+    localStorage.removeItem('user_abilities')
+    
+    // 添加短暂延时，确保存储清除完成
+    await new Promise(resolve => setTimeout(resolve, 50))
+    
+    // 使用replace而不是push，避免浏览器历史记录问题
+    router.replace('/')
+  } catch (error) {
+    console.error('返回首页失败:', error)
+    // 即使失败也跳转到首页
+    router.replace('/')
+  }
 }
 </script>
 

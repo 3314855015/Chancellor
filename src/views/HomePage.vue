@@ -65,7 +65,7 @@
 
       <!-- 已登录用户信息展示 -->
       <div class="user-dashboard" v-if="isAuthenticated">
-        <h2 class="cute-subtitle">🎯 欢迎回来，{{ user?.username }}</h2>
+        <h2 class="cute-subtitle">🎯 欢迎回来！</h2>
         <div class="user-role-info">
           <div class="role-badge" :class="user?.role">
             {{ getRoleDisplayName(user?.role) }}
@@ -183,6 +183,10 @@ const handleLoginSuccess = async () => {
   
   // 等待Pinia状态更新完成
   await new Promise(resolve => setTimeout(resolve, 100))
+  
+  // 添加延时机制，让用户有时间看到成功提示
+  // 2秒延时，给用户良好的视觉体验
+  await new Promise(resolve => setTimeout(resolve, 2000))
   
   // 根据用户角色自动跳转到相应页面
   redirectToRolePage()

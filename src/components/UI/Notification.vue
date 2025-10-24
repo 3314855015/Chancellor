@@ -81,85 +81,108 @@ onMounted(() => {
 <style scoped>
 .notification {
   position: fixed;
-  top: 20px;
-  right: 20px;
+  top: 24px;
+  right: 24px;
   z-index: 10000;
-  min-width: 300px;
-  max-width: 500px;
-  border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  animation: slideIn 0.3s ease-out;
+  min-width: 320px;
+  max-width: 480px;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  animation: slideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   transform: translateX(0);
-  transition: transform 0.3s ease-out;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  overflow: hidden;
 }
 
 .notification.hiding {
-  transform: translateX(100%);
+  transform: translateX(120%);
+  opacity: 0;
 }
 
 .notification.success {
-  background: #d4edda;
-  border: 1px solid #c3e6cb;
-  color: #155724;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
 .notification.error {
-  background: #f8d7da;
-  border: 1px solid #f5c6cb;
-  color: #721c24;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
 .notification.warning {
-  background: #fff3cd;
-  border: 1px solid #ffeaa7;
-  color: #856404;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+  border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
 .notification.info {
-  background: #d1ecf1;
-  border: 1px solid #bee5eb;
-  color: #0c5460;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  border: 1px solid rgba(59, 130, 246, 0.3);
 }
 
 .notification-content {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: 16px 20px;
+  position: relative;
+}
+
+.notification-content::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .notification-message {
   flex: 1;
-  font-size: 0.9rem;
-  line-height: 1.4;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  font-weight: 500;
+  letter-spacing: 0.01em;
 }
 
 .notification-close {
-  background: none;
+  background: rgba(255, 255, 255, 0.2);
   border: none;
-  font-size: 1.2rem;
-  color: inherit;
+  font-size: 1.1rem;
+  color: white;
   cursor: pointer;
-  margin-left: 12px;
-  padding: 0;
-  width: 20px;
-  height: 20px;
+  margin-left: 16px;
+  padding: 4px;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 2px;
-  opacity: 0.7;
-  transition: opacity 0.2s ease;
+  border-radius: 6px;
+  opacity: 0.8;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(4px);
 }
 
 .notification-close:hover {
   opacity: 1;
-  background: rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.05);
+}
+
+.notification-close:active {
+  transform: scale(0.95);
 }
 
 @keyframes slideIn {
   from {
-    transform: translateX(100%);
+    transform: translateX(120%);
     opacity: 0;
   }
   to {
@@ -174,8 +197,28 @@ onMounted(() => {
     opacity: 1;
   }
   to {
-    transform: translateX(100%);
+    transform: translateX(120%);
     opacity: 0;
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 640px) {
+  .notification {
+    top: 16px;
+    right: 16px;
+    left: 16px;
+    min-width: auto;
+    max-width: none;
+    border-radius: 8px;
+  }
+  
+  .notification-content {
+    padding: 12px 16px;
+  }
+  
+  .notification-message {
+    font-size: 0.9rem;
   }
 }
 </style>
