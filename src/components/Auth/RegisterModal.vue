@@ -72,7 +72,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useNotification } from '@/composables/useNotification'
-import { register } from '@/services/supabaseAuthService'
+import { useAuthStore } from '@/stores/authStore'
 
 interface Props {
   visible: boolean
@@ -87,6 +87,7 @@ interface Emits {
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
+const authStore = useAuthStore()
 const { showError, showSuccess } = useNotification()
 
 const loading = ref(false)
@@ -182,15 +183,15 @@ const handleSubmit = async () => {
   loading.value = true
   
   try {
-    // 调用真实的Supabase注册服务
-const result = await register({
-  username: formData.value.username.trim(),
-  email: formData.value.email.trim(),
-  password: formData.value.password,
-  confirmPassword: formData.value.confirmPassword, // 添加这一行
-  role: 'student', // 添加这一行，固定为 'student'
-  agreeTerms: formData.value.agreeTerms // 添加这一行
-})
+    // 调用真实的认证存储注册服务
+    const result = await authStore.userRegister({
+      username: formData.value.username.trim(),
+      email: formData.value.email.trim(),
+      password: formData.value.password,
+      confirmPassword: formData.value.confirmPassword,
+      role: 'student',
+      agreeTerms: formData.value.agreeTerms
+    })
 
     if (result.success) {
       showSuccess(result.message || '注册成功！请登录您的账户')

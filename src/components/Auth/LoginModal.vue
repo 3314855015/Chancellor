@@ -125,26 +125,8 @@ const handleSubmit = async () => {
       emit('success')
       handleClose()
       
-      // 根据用户角色跳转到对应页面
-      const user = authStore.user
-      if (user) {
-        switch (user.role) {
-          case 'admin':
-            router.push('/admin')
-            break
-          case 'examiner':
-            router.push('/examiner')
-            break
-          case 'enterprise':
-            router.push('/enterprise')
-            break
-          case 'student':
-            router.push('/student')
-            break
-          default:
-            router.push('/')
-        }
-      }
+      // 登录成功后，HomePage会自动根据用户角色跳转
+      // 这里只需要触发success事件，跳转逻辑在HomePage中处理
     } else {
       showError(result.message || '登录失败，请检查用户名和密码')
     }
@@ -160,6 +142,17 @@ const handleSubmit = async () => {
 watch(() => props.visible, (newVal) => {
   if (newVal) {
     lockBodyScroll()
+    // 模态框打开时立即清空表单数据，防止浏览器自动填充
+    formData.value = { username: '', password: '', rememberMe: false }
+    
+    // 使用nextTick确保DOM更新后清除浏览器自动填充
+    setTimeout(() => {
+      const usernameInput = document.getElementById('login-username') as HTMLInputElement
+      const passwordInput = document.getElementById('login-password') as HTMLInputElement
+      
+      if (usernameInput) usernameInput.value = ''
+      if (passwordInput) passwordInput.value = ''
+    }, 50)
   } else {
     unlockBodyScroll()
     formData.value = { username: '', password: '', rememberMe: false }

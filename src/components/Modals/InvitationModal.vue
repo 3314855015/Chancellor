@@ -1,25 +1,33 @@
 <template>
   <BaseModal 
     :visible="visible" 
-    title="📨 接受邀约 - 生成企业密钥"
-    @close="$emit('close')"
+    title="📨 接受邀约 - 使用企业密钥"
+    @close="handleClose"
   >
     <div class="invitation-content">
       <div class="info-section">
-        <p>生成企业密钥【请帖】，用于企业身份认证和注册。</p>
-        <div class="key-display" v-if="generatedKey">
-          <h4>生成的密钥：</h4>
-          <div class="key-value">{{ generatedKey }}</div>
-          <button class="copy-btn" @click="copyKey">复制密钥</button>
+        <p>请输入企业密钥【请帖】来升级为州牧（企业）身份</p>
+        <div class="key-input-section">
+          <label for="invitation-key">企业密钥：</label>
+          <input 
+            id="invitation-key"
+            v-model="keyValue"
+            type="text"
+            placeholder="请输入企业密钥"
+            class="key-input"
+          />
+        </div>
+        <div class="error-message" v-if="errorMessage">
+          {{ errorMessage }}
         </div>
       </div>
     </div>
     
     <template #footer>
-      <button class="generate-btn" @click="generateKey">
-        {{ generatedKey ? '重新生成' : '生成密钥' }}
+      <button class="confirm-btn" @click="handleConfirm" :disabled="loading">
+        {{ loading ? '验证中...' : '确认升级' }}
       </button>
-      <button class="cancel-btn" @click="$emit('close')">关闭</button>
+      <button class="cancel-btn" @click="handleClose">取消</button>
     </template>
   </BaseModal>
 </template>
@@ -27,30 +35,72 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import BaseModal from './BaseModal.vue'
+import { useAuthStore } from '@/stores/authStore'
 
 interface Props {
   visible: boolean
 }
 
-defineProps<Props>()
-
-// const emit = defineEmits<{
-//   close: []
-// }>()
-
-const generatedKey = ref('')
-
-const generateKey = () => {
-  generatedKey.value = 'QT_' + Math.random().toString(36).substr(2, 9).toUpperCase()
+interface Emits {
+  (e: 'close'): void
+  (e: 'success'): void
 }
 
-const copyKey = async () => {
+defineProps<Props>()
+const emit = defineEmits<Emits>()
+
+const authStore = useAuthStore()
+const keyValue = ref('')
+const errorMessage = ref('')
+const loading = ref(false)
+
+const handleClose = () => {
+  keyValue.value = ''
+  errorMessage.value = ''
+  loading.value = false
+  emit('close')
+}
+
+const handleConfirm = async () => {
+  if (!keyValue.value.trim()) {
+    errorMessage.value = '请输入企业密钥'
+    return
+  }
+
+  loading.value = true
+  errorMessage.value = ''
+
   try {
-    await navigator.clipboard.writeText(generatedKey.value)
-    alert('密钥已复制到剪贴板')
-  } catch (err) {
-    console.error('复制失败:', err)
-    alert('复制失败，请手动复制密钥')
+    // 首先验证密钥类型
+    const validationResult = await authStore.validateKey(keyValue.value)
+    
+    if (!validationResult.success) {
+      errorMessage.value = validationResult.message || '密钥验证失败'
+      return
+    }
+
+    // 检查密钥类型是否为invitation（企业密钥）
+    const keyType = validationResult.data?.key?.keyType
+    if (keyType !== 'invitation') {
+      errorMessage.value = '请输入正确的企业密钥'
+      return
+    }
+
+    // 调用API服务进行权限升级
+    const result = await authStore.upgradeRole({ keyValue: keyValue.value })
+    
+    if (result.success) {
+      // 升级成功，触发成功事件，由父组件处理页面跳转
+      emit('success')
+      handleClose()
+    } else {
+      errorMessage.value = result.message || '密钥验证失败'
+    }
+  } catch (error) {
+    console.error('升级失败:', error)
+    errorMessage.value = '升级失败，请稍后重试'
+  } finally {
+    loading.value = false
   }
 }
 </script>
@@ -70,45 +120,43 @@ const copyKey = async () => {
   margin-bottom: 20px;
 }
 
-.key-display {
-  background: rgba(135, 206, 235, 0.1);
-  border: 1px solid rgba(135, 206, 235, 0.3);
-  border-radius: 8px;
-  padding: 15px;
-  margin-top: 15px;
+.key-input-section {
+  text-align: left;
+  margin-bottom: 15px;
 }
 
-.key-display h4 {
-  margin: 0 0 10px;
+.key-input-section label {
+  display: block;
+  margin-bottom: 8px;
   color: #2c3e50;
-  font-size: 1rem;
+  font-weight: 500;
 }
 
-.key-value {
-  font-family: 'Courier New', monospace;
-  font-weight: bold;
-  font-size: 1.1rem;
-  color: #f57c00;
-  margin-bottom: 10px;
-  word-break: break-all;
-}
-
-.copy-btn {
-  background: #87CEEB;
-  color: white;
-  border: none;
-  padding: 8px 16px;
+.key-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #ddd;
   border-radius: 6px;
-  cursor: pointer;
+  font-size: 1rem;
+  font-family: 'Courier New', monospace;
+  transition: border-color 0.3s ease;
+  box-sizing: border-box;
+}
+
+.key-input:focus {
+  outline: none;
+  border-color: #87CEEB;
+  box-shadow: 0 0 0 2px rgba(135, 206, 235, 0.2);
+}
+
+.error-message {
+  color: #e74c3c;
   font-size: 0.9rem;
-  transition: background 0.3s ease;
+  margin-top: 10px;
+  text-align: center;
 }
 
-.copy-btn:hover {
-  background: #76b9d6;
-}
-
-.generate-btn {
+.confirm-btn {
   background: #4caf50;
   color: white;
   border: none;
@@ -117,10 +165,16 @@ const copyKey = async () => {
   cursor: pointer;
   font-size: 0.9rem;
   transition: background 0.3s ease;
+  margin-right: 10px;
 }
 
-.generate-btn:hover {
+.confirm-btn:hover:not(:disabled) {
   background: #45a049;
+}
+
+.confirm-btn:disabled {
+  background: #95a5a6;
+  cursor: not-allowed;
 }
 
 .cancel-btn {

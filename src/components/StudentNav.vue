@@ -28,12 +28,14 @@
     <PromotionModal 
       v-model:visible="showPromotion" 
       @close="hidePromotionModal"
+      @success="handlePromotionSuccess"
     />
 
     <!-- 接受邀约模态框 -->
     <InvitationModal 
       v-model:visible="showInvitation" 
       @close="hideInvitationModal"
+      @success="handleInvitationSuccess"
     />
   </header>
 </template>
@@ -69,6 +71,16 @@ const showInvitationModal = () => {
 
 const hideInvitationModal = () => {
   showInvitation.value = false
+}
+
+const handlePromotionSuccess = () => {
+  // 身份升级成功，跳转到主页面（下次登录会直接进入对应角色页面）
+  window.location.href = '/'
+}
+
+const handleInvitationSuccess = () => {
+  // 身份升级成功，跳转到主页面（下次登录会直接进入对应角色页面）
+  window.location.href = '/'
 }
 </script>
 
