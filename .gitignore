@@ -30,3 +30,8 @@ coverage/
 
 # 系统文件
 Thumbs.db
+
+# 测试文件
+test/
+*.test.js
+*.spec.js
