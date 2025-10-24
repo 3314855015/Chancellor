@@ -1,14 +1,32 @@
 // 认证状态管理
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { User, UserState, LoginRequest, RegisterRequest } from '@/types/auth'
-import { login, register, logout, getCurrentUser, validateToken } from '@/services/authService'
+import type { 
+  User, 
+  UserState, 
+  LoginRequest, 
+  RegisterRequest, 
+  UserAbilities,
+  UseKeyRequest,
+  GenerateKeyRequest 
+} from '@/types/auth'
+import { 
+  login, 
+  register, 
+  logout, 
+  getCurrentUser, 
+  validateToken,
+  useKey,
+  generateKey,
+  validateKey 
+} from '@/services/supabaseAuthService'
 
 export const useAuthStore = defineStore('auth', () => {
   // 状态
   const isAuthenticated = ref(false)
   const user = ref<User | null>(null)
   const token = ref<string | null>(null)
+  const abilities = ref<UserAbilities | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -17,6 +35,7 @@ export const useAuthStore = defineStore('auth', () => {
     isAuthenticated: isAuthenticated.value,
     user: user.value,
     token: token.value,
+    abilities: abilities.value,
     loading: loading.value,
     error: error.value
   })
@@ -53,6 +72,11 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // 设置能力信息
+  const setAbilities = (abilitiesData: UserAbilities | null) => {
+    abilities.value = abilitiesData
+  }
+
   // 用户登录
   const userLogin = async (credentials: LoginRequest) => {
     setLoading(true)
@@ -64,6 +88,7 @@ export const useAuthStore = defineStore('auth', () => {
       if (response.success) {
         setUser(response.data.user)
         setToken(response.data.token)
+        setAbilities(response.data.abilities || null)
         return { success: true, message: response.message }
       } else {
         setError(response.message)
@@ -110,6 +135,7 @@ export const useAuthStore = defineStore('auth', () => {
       await logout()
       setUser(null)
       setToken(null)
+      setAbilities(null)
       clearError()
     } catch (err) {
       console.error('登出失败:', err)
@@ -129,11 +155,20 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const isValid = await validateToken()
       if (isValid) {
-        const response = await getCurrentUser()
-        if (response.success) {
-          setUser(response.data.user as any)
-          setToken(savedToken)
-          return true
+        // 从token中提取用户ID
+        // 注意：这里需要根据实际的token格式来提取用户ID
+        // 由于我们使用的是Supabase认证，可能需要从JWT token中解析用户信息
+        // 暂时使用简单的用户ID存储方式
+        const userId = localStorage.getItem('user_id')
+        
+        if (userId) {
+          const response = await getCurrentUser(userId)
+          if (response.success && response.data.user) {
+            setUser(response.data.user)
+            setToken(savedToken)
+            setAbilities(response.data.abilities || null)
+            return true
+          }
         }
       }
     } catch (err) {
@@ -143,7 +178,91 @@ export const useAuthStore = defineStore('auth', () => {
     // token无效，清除本地存储
     setUser(null)
     setToken(null)
+    setAbilities(null)
     return false
+  }
+
+  // 使用密钥升级权限
+  const upgradeRole = async (request: UseKeyRequest) => {
+    setLoading(true)
+    clearError()
+    
+    if (!user.value) {
+      setError('请先登录')
+      setLoading(false)
+      return { success: false, message: '请先登录' }
+    }
+    
+    try {
+      const response = await useKey(request, user.value.id)
+      
+      if (response.success) {
+        setUser(response.data.user)
+        setAbilities(response.data.abilities || null)
+        return { success: true, message: response.message }
+      } else {
+        setError(response.message)
+        return { success: false, message: response.message }
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '权限升级失败'
+      setError(message)
+      return { success: false, message }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 生成密钥（管理员功能）
+  const createKey = async (request: GenerateKeyRequest) => {
+    setLoading(true)
+    clearError()
+    
+    if (!user.value || user.value.role !== 'admin') {
+      setError('只有管理员可以生成密钥')
+      setLoading(false)
+      return { success: false, message: '只有管理员可以生成密钥' }
+    }
+    
+    try {
+      const response = await generateKey(request, user.value.id)
+      
+      if (response.success) {
+        return { success: true, message: response.message, data: response.data }
+      } else {
+        setError(response.message)
+        return { success: false, message: response.message }
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '密钥生成失败'
+      setError(message)
+      return { success: false, message }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 验证密钥
+  const verifyKey = async (keyValue: string) => {
+    setLoading(true)
+    clearError()
+    
+    try {
+      const response = await validateKey(keyValue)
+      
+      if (response.success) {
+        return { success: true, message: response.message, data: response.data }
+      } else {
+        setError(response.message)
+        return { success: false, message: response.message }
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '密钥验证失败'
+      setError(message)
+      return { success: false, message }
+    } finally {
+      setLoading(false)
+    }
   }
 
   // 初始化时检查登录状态
@@ -156,6 +275,7 @@ export const useAuthStore = defineStore('auth', () => {
     isAuthenticated,
     user,
     token,
+    abilities,
     loading,
     error,
     
@@ -168,10 +288,14 @@ export const useAuthStore = defineStore('auth', () => {
     setLoading,
     setUser,
     setToken,
+    setAbilities,
     userLogin,
     userRegister,
     userLogout,
     checkAuthStatus,
+    upgradeRole,
+    createKey,
+    verifyKey,
     initializeAuth
   }
 })
