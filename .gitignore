@@ -35,3 +35,18 @@ Thumbs.db
 test/
 *.test.js
 *.spec.js
+
+# 文档文件
+*.md
+README_V1.md
+SUPABASE_FIX_SUMMARY.md
+DEPLOYMENT.md
+需求文档.md
+
+# 数据库文件
+database/
+*.sql
+
+# 部署配置
+vercel.json
+tsconfig.deploy.json
