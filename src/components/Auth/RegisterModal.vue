@@ -72,6 +72,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useNotification } from '@/composables/useNotification'
+import { register } from '@/services/supabaseAuthService'
 
 interface Props {
   visible: boolean
@@ -181,15 +182,26 @@ const handleSubmit = async () => {
   loading.value = true
   
   try {
-    // 模拟网络请求
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    
-    // 注册成功
-    showSuccess('注册成功！请登录您的账户')
-    emit('success')
-    handleClose()
+    // 调用真实的Supabase注册服务
+const result = await register({
+  username: formData.value.username.trim(),
+  email: formData.value.email.trim(),
+  password: formData.value.password,
+  confirmPassword: formData.value.confirmPassword, // 添加这一行
+  role: 'student', // 添加这一行，固定为 'student'
+  agreeTerms: formData.value.agreeTerms // 添加这一行
+})
+
+    if (result.success) {
+      showSuccess(result.message || '注册成功！请登录您的账户')
+      emit('success')
+      handleClose()
+    } else {
+      showError(result.message || '注册失败，请稍后重试')
+    }
   } catch (error) {
-    showError('注册失败，请稍后重试')
+    console.error('注册过程中发生错误:', error)
+    showError('注册失败，请检查网络连接或稍后重试')
   } finally {
     loading.value = false
   }

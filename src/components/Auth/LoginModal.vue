@@ -49,7 +49,9 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useNotification } from '@/composables/useNotification'
+import { useAuthStore } from '@/stores/authStore'
 
 interface Props {
   visible: boolean
@@ -64,6 +66,8 @@ interface Emits {
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
+const router = useRouter()
+const authStore = useAuthStore()
 const { showError, showSuccess } = useNotification()
 
 const loading = ref(false)
@@ -110,14 +114,42 @@ const handleSubmit = async () => {
   loading.value = true
   
   try {
-    // 模拟网络请求
-    await new Promise(resolve => setTimeout(resolve, 1500))
+    // 调用真实的认证服务
+    const result = await authStore.userLogin({
+      username: formData.value.username,
+      password: formData.value.password
+    })
     
-    // 登录成功
-    showSuccess('登录成功！')
-    emit('success')
-    handleClose()
+    if (result.success) {
+      showSuccess('登录成功！')
+      emit('success')
+      handleClose()
+      
+      // 根据用户角色跳转到对应页面
+      const user = authStore.user
+      if (user) {
+        switch (user.role) {
+          case 'admin':
+            router.push('/admin')
+            break
+          case 'examiner':
+            router.push('/examiner')
+            break
+          case 'enterprise':
+            router.push('/enterprise')
+            break
+          case 'student':
+            router.push('/student')
+            break
+          default:
+            router.push('/')
+        }
+      }
+    } else {
+      showError(result.message || '登录失败，请检查用户名和密码')
+    }
   } catch (error) {
+    console.error('登录错误:', error)
     showError('登录失败，请检查用户名和密码')
   } finally {
     loading.value = false

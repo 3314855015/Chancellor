@@ -13,7 +13,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 
-// 模拟学生状态，实际应该从store或props获取
+// 学生状态，从props或store获取
 const studentStatus = ref('wild') // 'wild' 在野, 'selected' 中举
 
 const statusIcon = computed(() => {
@@ -24,10 +24,8 @@ const statusText = computed(() => {
   return studentStatus.value === 'wild' ? '范进中举' : '金榜题名'
 })
 
-// 模拟状态切换（实际应该根据真实数据）
-setTimeout(() => {
-  studentStatus.value = 'selected'
-}, 3000)
+// 状态切换（根据真实数据）
+// 这里应该根据实际的用户状态数据来设置
 </script>
 
 <style scoped>
