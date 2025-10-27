@@ -2,24 +2,32 @@
   <BaseModal 
     :visible="visible" 
     title="👥 招生 - 生成学生密钥"
-    @close="$emit('close')"
+    @close="handleClose"
   >
     <div class="recruitment-content">
       <div class="info-section">
         <p>生成学生密钥【招生】，用于学生身份认证和注册。</p>
+        <div class="error-message" v-if="errorMessage">
+          {{ errorMessage }}
+        </div>
         <div class="key-display" v-if="generatedKey">
           <h4>生成的密钥：</h4>
-          <div class="key-value">{{ generatedKey }}</div>
+          <div class="key-value">{{ generatedKey.keyValue }}</div>
+          <div class="key-info">
+            <p><strong>类型：</strong>{{ generatedKey.keyType === 'invitation' ? '招生密钥' : generatedKey.keyType }}</p>
+            <p><strong>过期时间：</strong>{{ formatDate(generatedKey.expiresAt) }}</p>
+            <p><strong>最大使用次数：</strong>{{ generatedKey.maxUses }}次</p>
+          </div>
           <button class="copy-btn" @click="copyKey">复制密钥</button>
         </div>
       </div>
     </div>
     
     <template #footer>
-      <button class="generate-btn" @click="generateKey">
-        {{ generatedKey ? '重新生成' : '生成密钥' }}
+      <button class="generate-btn" @click="generateKey" :disabled="loading">
+        {{ loading ? '生成中...' : (generatedKey ? '重新生成' : '生成密钥') }}
       </button>
-      <button class="cancel-btn" @click="$emit('close')">关闭</button>
+      <button class="cancel-btn" @click="handleClose">关闭</button>
     </template>
   </BaseModal>
 </template>
@@ -27,31 +35,74 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import BaseModal from './BaseModal.vue'
+import adminService from '@/services/adminService'
+import authService from '@/services/authService'
 
 interface Props {
   visible: boolean
 }
 
+interface Emits {
+  (e: 'close'): void
+}
+
 defineProps<Props>()
+const emit = defineEmits<Emits>()
 
-// const emit = defineEmits<{
-//   close: []
-// }>()
+const generatedKey = ref<any>(null)
+const errorMessage = ref('')
+const loading = ref(false)
 
-const generatedKey = ref('')
+const handleClose = () => {
+  generatedKey.value = null
+  errorMessage.value = ''
+  loading.value = false
+  emit('close')
+}
 
-const generateKey = () => {
-  generatedKey.value = 'XS_' + Math.random().toString(36).substr(2, 9).toUpperCase()
+const generateKey = async () => {
+  loading.value = true
+  errorMessage.value = ''
+  
+  try {
+    const currentUser = authService.getCurrentUser()
+    if (!currentUser?.id) {
+      throw new Error('用户未登录')
+    }
+
+    const response = await adminService.generateKey({
+      keyType: 'invitation',
+      expiresInDays: 30,
+      maxUses: 10,
+      description: '招生密钥 - 用于学生注册'
+    }, currentUser.id)
+
+    if (response.success && response.data.key) {
+      generatedKey.value = response.data.key
+    } else {
+      throw new Error(response.message || '密钥生成失败')
+    }
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '生成密钥失败'
+  } finally {
+    loading.value = false
+  }
 }
 
 const copyKey = async () => {
+  if (!generatedKey.value) return
+  
   try {
-    await navigator.clipboard.writeText(generatedKey.value)
+    await navigator.clipboard.writeText(generatedKey.value.keyValue)
     alert('密钥已复制到剪贴板')
   } catch (err) {
     console.error('复制失败:', err)
     alert('复制失败，请手动复制密钥')
   }
+}
+
+const formatDate = (dateString: string) => {
+  return new Date(dateString).toLocaleString('zh-CN')
 }
 </script>
 

@@ -184,6 +184,36 @@ export interface Database {
           }
         ]
       }
+      student_teacher_relations: {
+        Row: {
+          id: number
+          student_id: string
+          teacher_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          student_id: string
+          teacher_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          student_id?: string
+          teacher_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_student_teacher_student"
+            columns: ["student_id"]
+          },
+          {
+            foreignKeyName: "fk_student_teacher_teacher"
+            columns: ["teacher_id"]
+          }
+        ]
+      }
     }
     Views: {
       user_summary: {

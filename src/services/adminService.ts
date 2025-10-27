@@ -265,7 +265,7 @@ export const generateKeysBatch = async (
         
         try {
           // 使用RPC函数绕过RLS限制
-          const { data: rpcResult, error: rpcError } = await supabase.rpc('generate_invitation_key', {
+          const { error: rpcError } = await supabase.rpc('generate_invitation_key', {
             p_key_value: keyValue,
             p_key_type: keyType,
             p_creator_id: creatorId,

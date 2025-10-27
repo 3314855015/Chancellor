@@ -58,14 +58,14 @@ export const login = async (credentials: LoginRequest): Promise<AuthResponse> =>
         })
 
       if (error) {
-        console.error('RPC认证失败:', error)
+        console.error('RPC认证失败')
       } else if (!data || !Array.isArray(data) || (data as any[]).length === 0) {
         throw new Error('用户名或密码错误')
       } else {
         userData = (data as any[])[0]
       }
     } catch (error) {
-      console.error('RPC认证异常:', error)
+      console.error('RPC认证异常')
     }
 
     // 方案2：如果RPC调用失败，使用直接SQL查询作为备用方案
@@ -353,7 +353,7 @@ export const validateKey = async (keyValue: string): Promise<KeyResponse> => {
       })
 
     if (error) {
-      console.error('RPC验证密钥失败:', error)
+      console.error('RPC验证密钥失败')
       throw new Error('密钥验证失败')
     }
 
@@ -411,7 +411,7 @@ export const useKey = async (request: UseKeyRequest, currentUserId: string): Pro
       })
 
     if (error) {
-      console.error('RPC使用密钥失败:', error)
+      console.error('RPC使用密钥失败')
       throw new Error('权限升级失败')
     }
 
