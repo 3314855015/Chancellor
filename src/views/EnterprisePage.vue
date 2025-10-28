@@ -219,7 +219,7 @@ const fetchAIRecommendations = async () => {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
 
-    // 检查响应内容类型
+    // 检查响应内容类型1
     const contentType = response.headers.get('content-type')
     if (!contentType || !contentType.includes('application/json')) {
       throw new Error('服务器返回了非JSON格式的响应')
