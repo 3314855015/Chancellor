@@ -1,9 +1,17 @@
 // 教师服务 - 专门处理教师相关功能
 import { supabase } from '@/lib/supabase.client'
+import authService from '@/services/authService'
 import type { 
   KeyResponse,
   InvitationKey
 } from '@/types/auth'
+
+// 定义能力信息接口（与studentService.ts保持一致）
+interface AbilityInfo {
+  name: string
+  value: number
+  icon: string
+}
 
 // 定义类型接口
 interface StudentData {
@@ -395,9 +403,366 @@ export const bindStudentTeacher = async (keyValue: string, studentId: string): P
   }
 }
 
+/**
+ * 获取学生能力数据（教师视角）
+ */
+export const getStudentAbilities = async (studentId: string): Promise<{
+  success: boolean
+  message: string
+  data: {
+    abilities: AbilityInfo[]
+  }
+}> => {
+  try {
+    const currentUser = authService.getCurrentUser()
+    if (!currentUser) {
+      return {
+        success: false,
+        message: '用户未登录',
+        data: { abilities: [] }
+      }
+    }
+
+    // 首先检查Supabase认证状态，如果没有认证则设置认证
+    const { data: sessionData } = await supabase.auth.getSession()
+    if (!sessionData.session) {
+      console.warn('Supabase会话未认证，尝试设置认证')
+      
+      // 获取当前用户的认证token
+      const token = authService.getToken()
+      if (token) {
+        // 设置Supabase认证会话
+        const { data: signInData, error: signInError } = await supabase.auth.setSession({
+          access_token: token,
+          refresh_token: ''
+        })
+        
+        if (signInError) {
+          console.warn('设置Supabase会话失败:', signInError)
+          // 尝试使用自定义认证方式
+          return await getStudentAbilitiesWithCustomAuth(studentId)
+        }
+        
+        console.log('Supabase会话设置成功')
+      } else {
+        console.warn('没有认证token，使用自定义认证方式')
+        return await getStudentAbilitiesWithCustomAuth(studentId)
+      }
+    }
+
+    // 尝试查询能力数据
+    let abilityData: any = null
+    try {
+      const { data, error } = await supabase
+        .from('user_abilities')
+        .select('*')
+        .eq('user_id', studentId)
+      
+      console.log('学生能力数据查询结果:', { data, error })
+      
+      if (!error && data && data.length > 0) {
+        abilityData = data[0]
+        console.log('获取到学生能力数据:', abilityData)
+      } else {
+        console.warn('未找到学生能力数据或查询失败:', error)
+      }
+    } catch (queryError) {
+      console.warn('查询学生能力数据异常:', queryError)
+    }
+
+    // 定义默认能力数据
+    const defaultAbilities: AbilityInfo[] = [
+      { name: '前端开发', value: 0, icon: '💻' },
+      { name: '安卓开发', value: 0, icon: '📱' },
+      { name: '后端开发', value: 0, icon: '⚙️' },
+      { name: '人工智能', value: 0, icon: '🤖' },
+      { name: '沟通能力', value: 0, icon: '💬' },
+      { name: '创造力', value: 0, icon: '💡' },
+      { name: '领导力', value: 0, icon: '👑' }
+    ]
+
+    // 如果有能力数据，更新默认值
+    if (abilityData) {
+      const abilities: AbilityInfo[] = [
+        { name: '前端开发', value: abilityData.frontend_points || 0, icon: '💻' },
+        { name: '安卓开发', value: abilityData.android_points || 0, icon: '📱' },
+        { name: '后端开发', value: abilityData.backend_points || 0, icon: '⚙️' },
+        { name: '人工智能', value: abilityData.ai_points || 0, icon: '🤖' },
+        { name: '沟通能力', value: abilityData.communication_points || 0, icon: '💬' },
+        { name: '创造力', value: abilityData.creativity_points || 0, icon: '💡' },
+        { name: '领导力', value: abilityData.leadership_points || 0, icon: '👑' }
+      ]
+
+      return {
+        success: true,
+        message: '获取学生能力数据成功',
+        data: { abilities }
+      }
+    }
+
+    // 返回默认能力数据
+    return {
+      success: true,
+      message: '获取学生能力数据成功（使用默认值）',
+      data: { abilities: defaultAbilities }
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '获取学生能力数据失败'
+    return {
+      success: false,
+      message,
+      data: { abilities: [] }
+    }
+  }
+}
+
+/**
+ * 使用自定义认证方式获取学生能力数据
+ */
+const getStudentAbilitiesWithCustomAuth = async (studentId: string): Promise<{
+  success: boolean
+  message: string
+  data: {
+    abilities: AbilityInfo[]
+  }
+}> => {
+  try {
+    // 尝试使用RPC函数查询能力数据
+    const { data, error } = await supabase
+      .rpc('get_user_abilities_by_id', { p_user_id: studentId })
+    
+    if (!error && data && data.length > 0) {
+      console.log('通过RPC获取到学生能力数据:', data)
+      
+      // RPC返回的是数组，取第一个元素
+      const abilityData = data[0]
+      
+      const abilities: AbilityInfo[] = [
+        { name: '前端开发', value: abilityData.frontend_points || 0, icon: '💻' },
+        { name: '安卓开发', value: abilityData.android_points || 0, icon: '📱' },
+        { name: '后端开发', value: abilityData.backend_points || 0, icon: '⚙️' },
+        { name: '人工智能', value: abilityData.ai_points || 0, icon: '🤖' },
+        { name: '沟通能力', value: abilityData.communication_points || 0, icon: '💬' },
+        { name: '创造力', value: abilityData.creativity_points || 0, icon: '💡' },
+        { name: '领导力', value: abilityData.leadership_points || 0, icon: '👑' }
+      ]
+
+      return {
+        success: true,
+        message: '获取学生能力数据成功',
+        data: { abilities }
+      }
+    } else {
+      console.warn('RPC查询学生能力数据失败:', error)
+      // 如果RPC失败，返回默认值
+      const defaultAbilities: AbilityInfo[] = [
+        { name: '前端开发', value: 0, icon: '💻' },
+        { name: '安卓开发', value: 0, icon: '📱' },
+        { name: '后端开发', value: 0, icon: '⚙️' },
+        { name: '人工智能', value: 0, icon: '🤖' },
+        { name: '沟通能力', value: 0, icon: '💬' },
+        { name: '创造力', value: 0, icon: '💡' },
+        { name: '领导力', value: 0, icon: '👑' }
+      ]
+
+      return {
+        success: true,
+        message: '获取学生能力数据成功（使用默认值）',
+        data: { abilities: defaultAbilities }
+      }
+    }
+  } catch (error) {
+    console.error('自定义认证方式获取学生能力数据失败:', error)
+    const message = error instanceof Error ? error.message : '获取学生能力数据失败'
+    return {
+      success: false,
+      message,
+      data: { abilities: [] }
+    }
+  }
+}
+
+/**
+ * 分配学生能力点数
+ */
+export const assignStudentAbilities = async (studentId: string, abilityUpdates: any): Promise<{
+  success: boolean
+  message: string
+  data: {
+    remainingPoints: number
+  }
+}> => {
+  try {
+    const currentUser = authService.getCurrentUser()
+    if (!currentUser) {
+      return {
+        success: false,
+        message: '用户未登录',
+        data: {
+          remainingPoints: 0
+        }
+      }
+    }
+
+    // 首先检查Supabase认证状态
+    const { data: sessionData } = await supabase.auth.getSession()
+    if (!sessionData.session) {
+      console.warn('Supabase会话未认证，尝试设置认证')
+      
+      // 获取当前用户的认证token
+      const token = authService.getToken()
+      if (token) {
+        // 设置Supabase认证会话
+        const { data: signInData, error: signInError } = await supabase.auth.setSession({
+          access_token: token,
+          refresh_token: ''
+        })
+        
+        if (signInError) {
+          console.warn('设置Supabase会话失败:', signInError)
+          // 尝试使用自定义认证方式
+          return await assignStudentAbilitiesWithCustomAuth(studentId, abilityUpdates)
+        }
+        
+        console.log('Supabase会话设置成功')
+      } else {
+        console.warn('没有认证token，使用自定义认证方式')
+        return await assignStudentAbilitiesWithCustomAuth(studentId, abilityUpdates)
+      }
+    }
+
+    // 计算总分配点数
+    const totalPoints = (abilityUpdates.frontend_points || 0) +
+                        (abilityUpdates.android_points || 0) +
+                        (abilityUpdates.backend_points || 0) +
+                        (abilityUpdates.ai_points || 0) +
+                        (abilityUpdates.communication_points || 0) +
+                        (abilityUpdates.creativity_points || 0) +
+                        (abilityUpdates.leadership_points || 0)
+
+    // 验证点数不超过10点
+    if (totalPoints > 10) {
+      throw new Error(`分配点数超过限制：总点数 ${totalPoints} 超过10点限制`)
+    }
+
+    // 使用RPC函数更新能力数据，绕过RLS限制
+    const { data: rpcResult, error } = await supabase
+      .rpc('update_user_abilities', {
+        p_user_id: studentId,
+        p_frontend_points: abilityUpdates.frontend_points || 0,
+        p_android_points: abilityUpdates.android_points || 0,
+        p_backend_points: abilityUpdates.backend_points || 0,
+        p_ai_points: abilityUpdates.ai_points || 0,
+        p_communication_points: abilityUpdates.communication_points || 0,
+        p_creativity_points: abilityUpdates.creativity_points || 0,
+        p_leadership_points: abilityUpdates.leadership_points || 0
+      })
+
+    if (error) {
+      throw new Error(`RPC函数调用失败: ${error.message}`)
+    }
+
+    // 解析RPC返回结果
+    if (rpcResult && !rpcResult.success) {
+      throw new Error(`能力数据更新失败: ${rpcResult.message}`)
+    }
+
+    const remainingPoints = 10 - totalPoints
+
+    return {
+      success: true,
+      message: '能力分配成功',
+      data: {
+        remainingPoints
+      }
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '能力分配失败'
+    return {
+      success: false,
+      message,
+      data: {
+        remainingPoints: 0
+      }
+    }
+  }
+}
+
+/**
+ * 使用自定义认证方式分配学生能力点数
+ */
+const assignStudentAbilitiesWithCustomAuth = async (studentId: string, abilityUpdates: any): Promise<{
+  success: boolean
+  message: string
+  data: {
+    remainingPoints: number
+  }
+}> => {
+  try {
+    // 计算总分配点数
+    const totalPoints = (abilityUpdates.frontend_points || 0) +
+                        (abilityUpdates.android_points || 0) +
+                        (abilityUpdates.backend_points || 0) +
+                        (abilityUpdates.ai_points || 0) +
+                        (abilityUpdates.communication_points || 0) +
+                        (abilityUpdates.creativity_points || 0) +
+                        (abilityUpdates.leadership_points || 0)
+
+    // 验证点数不超过10点
+    if (totalPoints > 10) {
+      throw new Error(`分配点数超过限制：总点数 ${totalPoints} 超过10点限制`)
+    }
+
+    // 使用RPC函数更新能力数据，绕过RLS限制
+    const { data: rpcResult, error } = await supabase
+      .rpc('update_user_abilities', {
+        p_user_id: studentId,
+        p_frontend_points: abilityUpdates.frontend_points || 0,
+        p_android_points: abilityUpdates.android_points || 0,
+        p_backend_points: abilityUpdates.backend_points || 0,
+        p_ai_points: abilityUpdates.ai_points || 0,
+        p_communication_points: abilityUpdates.communication_points || 0,
+        p_creativity_points: abilityUpdates.creativity_points || 0,
+        p_leadership_points: abilityUpdates.leadership_points || 0
+      })
+
+    if (error) {
+      throw new Error(`RPC函数调用失败: ${error.message}`)
+    }
+
+    // 解析RPC返回结果
+    if (rpcResult && !rpcResult.success) {
+      throw new Error(`能力数据更新失败: ${rpcResult.message}`)
+    }
+
+    // 计算剩余点数
+    const remainingPoints = 10 - totalPoints
+
+    return {
+      success: true,
+      message: '能力分配成功',
+      data: {
+        remainingPoints
+      }
+    }
+  } catch (error) {
+    console.error('自定义认证方式分配能力失败:', error)
+    const message = error instanceof Error ? error.message : '能力分配失败'
+    return {
+      success: false,
+      message,
+      data: {
+        remainingPoints: 0
+      }
+    }
+  }
+}
+
 export default {
   generateTeacherKey,
   getTeacherStudents,
   getStudentTeacher,
-  bindStudentTeacher
+  bindStudentTeacher,
+  getStudentAbilities,
+  assignStudentAbilities
 }
