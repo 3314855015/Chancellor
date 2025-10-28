@@ -662,7 +662,7 @@ export const assignStudentAbilities = async (studentId: string, abilityUpdates: 
       throw new Error(`RPC函数调用失败: ${error.message}`)
     }
 
-    // 解析RPC返回结果
+    // 解析RPC返回结果 
     if (rpcResult && !rpcResult.success) {
       throw new Error(`能力数据更新失败: ${rpcResult.message}`)
     }
