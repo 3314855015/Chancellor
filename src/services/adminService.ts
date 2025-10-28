@@ -373,7 +373,10 @@ export const getKeysList = async (creatorId: string, page: number = 1, pageSize:
 
     const { data: keys, error, count } = await supabase
       .from('invitation_keys')
-      .select('*, creator:users(username)', { count: 'exact' })
+      .select(`
+        *,
+        creator:users!fk_invitation_keys_creator(username)
+      `, { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(from, to)
 

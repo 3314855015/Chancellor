@@ -13,9 +13,10 @@
 </template>
 
 <script setup lang="ts">
+const emit = defineEmits(['startRecruiting'])
+
 const startRecruiting = () => {
-  // 跳转到智能匹配招新功能
-  alert('开始安眠 - 智能匹配招新')
+  emit('startRecruiting')
 }
 </script>
 

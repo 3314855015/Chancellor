@@ -118,7 +118,8 @@
                       size="small" 
                       variant="danger"
                       @click="deleteKey(key.id)"
-                      :disabled="key.used"
+                      :disabled="key.used || isExpired(key)"
+                      :title="getDeleteButtonTitle(key)"
                     />
                   </div>
                 </td>
@@ -220,7 +221,7 @@ const loadKeys = async () => {
       throw new Error(response.message)
     }
   } catch (error) {
-    console.error('加载密钥列表失败:', error)
+    // 静默处理错误，不显示控制台日志
   } finally {
     loading.value = false
   }
@@ -246,7 +247,7 @@ const loadStatistics = async () => {
       }
     }
   } catch (error) {
-    console.error('加载统计信息失败:', error)
+    // 静默处理错误，不显示控制台日志
   }
 }
 
@@ -310,6 +311,17 @@ const getKeyTypeName = (type: string) => {
   }
 }
 
+// 删除按钮提示信息
+const getDeleteButtonTitle = (key: any) => {
+  if (key.used) {
+    return '已使用的密钥不能删除'
+  }
+  if (isExpired(key)) {
+    return '已过期的密钥不能删除'
+  }
+  return '删除此密钥'
+}
+
 // 复制密钥
 const copyKey = (keyValue: string) => {
   navigator.clipboard.writeText(keyValue)
@@ -318,6 +330,23 @@ const copyKey = (keyValue: string) => {
 
 // 删除密钥
 const deleteKey = async (keyId: number) => {
+  // 先检查密钥状态，已使用或已过期的密钥不能删除
+  const key = keys.value.find(k => k.id === keyId)
+  if (!key) {
+    alert('未找到要删除的密钥')
+    return
+  }
+  
+  if (key.used) {
+    alert('已使用的密钥不能删除')
+    return
+  }
+  
+  if (isExpired(key)) {
+    alert('已过期的密钥不能删除')
+    return
+  }
+  
   if (!confirm('确定要删除这个密钥吗？此操作不可撤销。')) {
     return
   }
