@@ -218,7 +218,7 @@ const fetchAIRecommendations = async () => {
   // 开始加载
   isLoading.value = true
 
-  // 发送请求到AI推荐服务
+  // 发送请求到AI推荐服务 
   //http://localhost:5678/webhook/ai-recommendation
   //http://localhost:5678/webhook-test/ai-recommendation
   //https://yjw123456.app.n8n.cloud/webhook/ai-recommendation
