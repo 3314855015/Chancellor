@@ -1,11 +1,14 @@
 <template>
-  <div class="enterprise-page">
+  <div class="enterprise-page" :class="{ 'no-scroll': isModalOpen }" ref="pageContainer">
     <EnterpriseNav 
       title="🏢 州牧面板" 
       subtitle="企业匹配 · 人才对接 · 点数使用"
     />
     
     <EnterpriseWelcome @start-recruiting="() => showDescriptionInput = true" />
+    
+    <!-- 加载动画 -->
+    <LoadingSpinner v-if="isLoading" />
     
     <!-- 描述输入模态框 -->
     <div v-if="showDescriptionInput" class="modal-overlay">
@@ -21,8 +24,8 @@
           ></textarea>
         </div>
         <div class="modal-actions">
-          <Button label="开始推荐" @click="fetchAIRecommendations" />
-          <Button label="取消" variant="secondary" @click="showDescriptionInput = false" />
+          <Button label="开始推荐" @click="fetchAIRecommendations" :disabled="isLoading" />
+          <Button label="取消" variant="secondary" @click="showDescriptionInput = false" :disabled="isLoading" />
         </div>
       </div>
     </div>
@@ -86,6 +89,7 @@ import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import Footer from '@/components/Footer.vue'
 import EnterpriseWelcome from '@/components/EnterpriseWelcome.vue'
+import LoadingSpinner from '@/components/LoadingSpinner.vue'
 
 
 
@@ -94,9 +98,16 @@ const showStudentCards = ref(false)
 const showDescriptionInput = ref(false)
 const userDescription = ref('')
 const selectedOption = ref(10)
+const isLoading = ref(false)
+const pageContainer = ref<HTMLElement | null>(null)
 const filter = ref({
   skill: '',
   ability: '0'
+})
+
+// 计算属性：判断是否有模态框打开
+const isModalOpen = computed(() => {
+  return showDescriptionInput.value || isLoading.value
 })
 
 const enterpriseInfo = ref({
@@ -204,8 +215,15 @@ const fetchAIRecommendations = async () => {
     return
   }
 
+  // 开始加载
+  isLoading.value = true
+
+  // 发送请求到AI推荐服务
+  //http://localhost:5678/webhook/ai-recommendation
+  //http://localhost:5678/webhook-test/ai-recommendation
+  //https://yjw123456.app.n8n.cloud/webhook/ai-recommendation
   try {
-    const response = await fetch('http://localhost:5678/webhook/ai-recommendation', {
+    const response = await fetch('https://yjw123456.app.n8n.cloud/webhook/ai-recommendation', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -219,7 +237,7 @@ const fetchAIRecommendations = async () => {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
 
-    // 检查响应内容类型1
+    // 检查响应内容类型
     const contentType = response.headers.get('content-type')
     if (!contentType || !contentType.includes('application/json')) {
       throw new Error('服务器返回了非JSON格式的响应')
@@ -317,6 +335,9 @@ const fetchAIRecommendations = async () => {
     ]
     showStudentCards.value = true
     showDescriptionInput.value = false
+  } finally {
+    // 无论成功或失败，都停止加载
+    isLoading.value = false
   }
 }
 </script>
@@ -750,5 +771,28 @@ const fetchAIRecommendations = async () => {
   .modal-content {
     padding: 20px;
   }
+}
+
+/* 禁用背景滚动和交互 */
+.enterprise-page.no-scroll {
+  overflow: hidden;
+  height: 100vh;
+  position: fixed;
+  width: 100%;
+  pointer-events: none;
+}
+
+.enterprise-page.no-scroll > * {
+  pointer-events: none;
+}
+
+.enterprise-page.no-scroll .modal-overlay,
+.enterprise-page.no-scroll .loading-overlay {
+  pointer-events: auto;
+}
+
+.enterprise-page.no-scroll .modal-content,
+.enterprise-page.no-scroll .loading-spinner {
+  pointer-events: auto;
 }
 </style>

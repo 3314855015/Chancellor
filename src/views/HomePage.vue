@@ -99,7 +99,7 @@
 
     <!-- 可爱风格底部 -->
     <div class="cute-footer">
-      <p>💝 © 2024 就业画像系统 · 温暖可爱的设计风格</p>
+      <p>💝 © Chancellor · 用对的时间，遇上对的人</p>
     </div>
   </div>
 </template>
@@ -190,6 +190,9 @@ const handleLoginSuccess = async () => {
   
   // 根据用户角色自动跳转到相应页面
   redirectToRolePage()
+
+  // 刷新页面，
+  window.location.reload()
 }
 
 // 处理注册成功
