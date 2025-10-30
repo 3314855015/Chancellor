@@ -197,11 +197,11 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import StudentNav from '@/components/StudentNav.vue'
+import StudentNav from '@/components/Nav/StudentNav.vue'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import Footer from '@/components/Footer.vue'
-import StudentWelcome from '@/components/StudentWelcome.vue'
+import StudentWelcome from '@/components/Welcome/StudentWelcome.vue'
 import studentService from '@/services/studentService'
 
 // 响应式数据

@@ -15,7 +15,7 @@
       <div class="modal-content">
         <h3>🔍 智能人才推荐</h3>
         <div class="description-input">
-          <label for="userDescription">请描述您需要的人才类型：</label>
+          <label for="userDescription">请描述您需要的人才类型，让我们为您分忧：</label>
           <textarea 
             id="userDescription" 
             v-model="userDescription" 
@@ -84,11 +84,11 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import EnterpriseNav from '@/components/EnterpriseNav.vue'
+import EnterpriseNav from '@/components/Nav/EnterpriseNav.vue'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import Footer from '@/components/Footer.vue'
-import EnterpriseWelcome from '@/components/EnterpriseWelcome.vue'
+import EnterpriseWelcome from '@/components/Welcome/EnterpriseWelcome.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 
 

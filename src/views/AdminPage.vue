@@ -122,11 +122,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import AdminNav from '@/components/AdminNav.vue'
+import AdminNav from '@/components/Nav/AdminNav.vue'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import Footer from '@/components/Footer.vue'
-import AdminWelcome from '@/components/AdminWelcome.vue'
+import AdminWelcome from '@/components/Welcome/AdminWelcome.vue'
 import adminService from '@/services/adminService'
 import authService from '@/services/authService'
 

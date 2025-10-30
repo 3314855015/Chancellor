@@ -159,7 +159,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import AdminNav from '@/components/AdminNav.vue'
+import AdminNav from '@/components/Nav/AdminNav.vue'
 import Button from '@/components/Button.vue'
 import Footer from '@/components/Footer.vue'
 import adminService from '@/services/adminService'

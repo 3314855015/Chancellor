@@ -309,11 +309,11 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import ExaminerNav from '@/components/ExaminerNav.vue'
+import ExaminerNav from '@/components/Nav/ExaminerNav.vue'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import Footer from '@/components/Footer.vue'
-import ExaminerWelcome from '@/components/ExaminerWelcome.vue'
+import ExaminerWelcome from '@/components/Welcome/ExaminerWelcome.vue'
 import examinerService from '@/services/examinerService'
 import authService from '@/services/authService'
 
