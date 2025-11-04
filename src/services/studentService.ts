@@ -127,13 +127,13 @@ export const getStudentInfo = async (): Promise<{
       // 继续使用默认值
     }
 
-    // 查询学生任务统计（由于student_tasks表可能不存在，使用默认值）
+    // 查询学生任务统计（由于task_assignments表可能不存在，使用默认值）
     let completedTasks = 0
     let currentTask = null
     
     try {
       const { data: taskStats } = await supabase
-        .from('student_tasks')
+        .from('task_assignments')
         .select('*')
         .eq('student_id', currentUser.id)
 
@@ -364,7 +364,7 @@ export const getStudentAbilities = async (): Promise<{
 }
 
 /**
- * 获取学生任务列表
+ * 获取学生任务列表（绑定教师发布的任务）
  */
 export const getStudentTasks = async (status?: 'available' | 'accepted' | 'completed'): Promise<{
   success: boolean
@@ -383,14 +383,128 @@ export const getStudentTasks = async (status?: 'available' | 'accepted' | 'compl
       }
     }
 
-    // 由于tasks表可能不存在，返回空任务列表
-    // 在实际部署时，需要先创建tasks表
-    const taskList: TaskInfo[] = []
+    // 首先检查Supabase认证状态，如果没有认证则设置认证
+    const { data: sessionData } = await supabase.auth.getSession()
+    if (!sessionData.session) {
+      console.warn('Supabase会话未认证，尝试设置认证')
+      
+      // 获取当前用户的认证token
+      const token = authService.getToken()
+      if (token) {
+        // 设置Supabase认证会话
+        const { data: signInData, error: signInError } = await supabase.auth.setSession({
+          access_token: token,
+          refresh_token: ''
+        })
+        
+        if (signInError) {
+          console.warn('设置Supabase会话失败:', signInError)
+          // 使用自定义认证方式获取任务
+          return await getStudentTasksWithCustomAuth(currentUser, status)
+        }
+        
+        console.log('Supabase会话设置成功')
+      } else {
+        console.warn('没有认证token，使用自定义认证方式')
+        return await getStudentTasksWithCustomAuth(currentUser, status)
+      }
+    }
+
+    // 查询学生绑定的教师
+    const { data: teacherDetails, error: teacherError } = await supabase
+      .from('student_teacher_details')
+      .select('teacher_id')
+      .eq('student_id', currentUser.id)
+
+    if (teacherError) {
+      throw new Error(teacherError.message)
+    }
+
+    // 如果没有绑定教师，返回空列表
+    if (!teacherDetails || teacherDetails.length === 0) {
+      return {
+        success: true,
+        message: '学生未绑定教师，暂无任务',
+        data: { tasks: [] }
+      }
+    }
+
+    const teacherId = teacherDetails[0].teacher_id
+
+    // 查询教师发布的任务
+    let query = supabase
+      .from('tasks')
+      .select(`
+        id,
+        title,
+        description,
+        reward,
+        deadline,
+        created_at,
+        publisher:users!tasks_teacher_id_fkey(username)
+      `)
+      .eq('teacher_id', teacherId)
+
+    // 根据状态过滤任务
+    if (status) {
+      query = query.eq('status', status)
+    }
+
+    const { data: tasksData, error: tasksError } = await query.order('created_at', { ascending: false })
+
+    if (tasksError) {
+      // 如果tasks表不存在，返回空列表
+      if (tasksError.code === 'PGRST116') {
+        console.warn('tasks表不存在，返回空任务列表')
+        return {
+          success: true,
+          message: '获取任务列表成功（暂无可接任务）',
+          data: { tasks: [] }
+        }
+      }
+      throw new Error(tasksError.message)
+    }
+
+    // 查询学生已接取的任务状态
+    let studentTasks: any[] = []
+    try {
+      const { data: studentTasksData } = await supabase
+        .from('task_assignments')
+        .select('task_id, status')
+        .eq('student_id', currentUser.id)
+
+      if (studentTasksData) {
+        studentTasks = studentTasksData
+      }
+    } catch (studentTaskError) {
+      console.warn('查询学生任务状态失败:', studentTaskError)
+    }
+
+    // 构建任务列表
+    const taskList: TaskInfo[] = (tasksData || []).map(task => {
+      // 查找学生对该任务的状态
+      const studentTask = studentTasks.find(st => st.task_id === task.id)
+      const taskStatus = studentTask ? studentTask.status : 'available'
+
+      return {
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        reward: task.reward,
+        deadline: task.deadline,
+        publisher: task.publisher && Array.isArray(task.publisher) && task.publisher.length > 0 ? task.publisher[0].username || '未知教师' : '未知教师',
+        status: taskStatus as 'available' | 'accepted' | 'completed',
+        createdAt: task.created_at
+      }
+    })
+
+    // 如果指定了状态，则按状态过滤
+    const filteredTasks = status ? taskList.filter(task => task.status === status) : taskList
 
     return {
       success: true,
-      message: '获取任务列表成功（暂无可接任务）',
-      data: { tasks: taskList }
+      message: `获取任务列表成功（共${filteredTasks.length}个任务）`,
+      data: { tasks: filteredTasks }
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : '获取任务列表失败'
@@ -420,13 +534,11 @@ export const acceptTask = async (taskId: string): Promise<{
       }
     }
 
+    // 使用RPC函数接取任务，处理冲突和业务逻辑
     const { error } = await supabase
-      .from('student_tasks')
-      .insert({
-        student_id: currentUser.id,
-        task_id: taskId,
-        status: 'accepted',
-        accepted_at: new Date().toISOString()
+      .rpc('accept_student_task', {
+        p_student_id: currentUser.id,
+        p_task_id: taskId
       })
 
     if (error) {
@@ -451,7 +563,7 @@ export const acceptTask = async (taskId: string): Promise<{
 /**
  * 提交任务成果
  */
-export const submitTask = async (taskId: string, submission: string): Promise<{
+export const submitTask = async (taskId: string, submissionContent: string): Promise<{
   success: boolean
   message: string
   data: null
@@ -466,24 +578,27 @@ export const submitTask = async (taskId: string, submission: string): Promise<{
       }
     }
 
-    const { error } = await supabase
-      .from('student_tasks')
-      .update({
-        status: 'completed',
-        submission: submission,
-        completed_at: new Date().toISOString()
-      })
-      .eq('student_id', currentUser.id)
-      .eq('task_id', taskId)
+    // 直接使用RPC函数提交任务，不设置复杂的认证会话
+    const { data, error } = await supabase.rpc('submit_task', {
+      p_student_id: currentUser.id,
+      p_task_id: taskId,
+      p_submission_content: submissionContent
+    })
 
     if (error) {
       throw new Error(error.message)
     }
-
-    return {
-      success: true,
-      message: '任务提交成功',
-      data: null
+    
+    // 检查函数返回值
+    if (data === 'success') {
+      return {
+        success: true,
+        message: '任务提交成功',
+        data: null
+      }
+    } else {
+      // 函数返回了错误信息
+      throw new Error(data || '任务提交失败')
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : '任务提交失败'
@@ -961,6 +1076,69 @@ const getDefaultAbilities = (): AbilityInfo[] => {
     { name: '创造力', value: 0, icon: '💡' },
     { name: '领导力', value: 0, icon: '👑' }
   ]
+}
+
+/**
+ * 使用自定义认证方式获取任务列表
+ */
+const getStudentTasksWithCustomAuth = async (currentUser: any, status?: 'available' | 'accepted' | 'completed'): Promise<{
+  success: boolean
+  message: string
+  data: {
+    tasks: TaskInfo[]
+  }
+}> => {
+  try {
+    // 使用RPC函数绕过RLS限制获取任务
+    const { data: tasksData, error } = await supabase
+      .rpc('get_student_tasks', { 
+        p_student_id: currentUser.id,
+        p_status: status || null
+      })
+
+    if (error) {
+      console.warn('RPC查询任务数据失败:', error)
+      // 如果RPC失败，返回空列表
+      return {
+        success: true,
+        message: '获取任务列表成功（暂无可接任务）',
+        data: { tasks: [] }
+      }
+    }
+
+    if (tasksData && tasksData.length > 0) {
+      const taskList: TaskInfo[] = tasksData.map((task: any) => ({
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        reward: task.reward_points || 0,
+        deadline: task.deadline,
+        publisher: task.publisher || '未知教师',
+        status: task.status as 'available' | 'accepted' | 'completed',
+        createdAt: task.created_at
+      }))
+
+      return {
+        success: true,
+        message: `获取任务列表成功（共${taskList.length}个任务）`,
+        data: { tasks: taskList }
+      }
+    } else {
+      // 没有任务数据，返回空列表
+      return {
+        success: true,
+        message: '获取任务列表成功（暂无可接任务）',
+        data: { tasks: [] }
+      }
+    }
+  } catch (error) {
+    console.error('自定义认证查询任务异常:', error)
+    return {
+      success: false,
+      message: '获取任务列表失败',
+      data: { tasks: [] }
+    }
+  }
 }
 
 export default {

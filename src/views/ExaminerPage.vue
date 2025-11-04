@@ -30,7 +30,7 @@
                   :loading="loading"
                   :disabled="loading"
                 />
-                <Button label="➕ 发布新任务" @click="showCreateTask = true" />
+                <Button label="➕ 发布新任务" @click="$router.push('/examiner/task/create')" />
               </div>
             </div>
             
@@ -140,11 +140,19 @@
         <!-- 布告栏区域 - 靠右 (25%) -->
         <div class="bulletin-sidebar">
           <section class="bulletin-section">
-            <h2 class="section-title">📋 布告栏</h2>
+            <div class="bulletin-header">
+              <h2 class="section-title">📋 布告栏</h2>
+              <Button 
+                label="📋 管理任务" 
+                size="small" 
+                variant="secondary" 
+                @click="$router.push('/examiner/task/manage')"
+              />
+            </div>
             
-            <!-- 任务列表 -->
+            <!-- 任务列表 - 只显示最新的2个任务 -->
             <div class="task-list">
-              <Card v-for="task in tasks" :key="task.id" class="task-card" hoverable>
+              <Card v-for="task in latestTasks" :key="task.id" class="task-card" hoverable>
                 <template #header>
                   <div class="task-header">
                     <h3>{{ task.title }}</h3>
@@ -168,21 +176,7 @@
         </div>
       </div>
 
-      <!-- 创建任务模态框 -->
-      <div v-if="showCreateTask" class="modal-overlay">
-        <div class="modal-content">
-          <h3>发布新任务</h3>
-          <form @submit.prevent="createTask">
-            <input v-model="newTask.title" placeholder="任务标题" required>
-            <textarea v-model="newTask.description" placeholder="任务描述" required></textarea>
-            <input v-model="newTask.reward" type="number" placeholder="奖励点数" min="1" max="4" required>
-            <div class="modal-actions">
-              <Button label="发布" type="submit" />
-              <Button label="取消" variant="secondary" @click="showCreateTask = false" />
-            </div>
-          </form>
-        </div>
-      </div>
+
 
       <!-- 分配能力模态框 -->
       <div v-if="showAssignAbilityModal" class="modal-overlay">
@@ -197,7 +191,11 @@
               <div class="ability-header">
                 <span class="ability-icon">{{ ability.icon }}</span>
                 <span class="ability-name">{{ ability.name }}</span>
-                <span class="current-score">当前: {{ ability.currentValue }}/10</span>
+                <span class="current-score">
+                  基础: {{ ability.currentValue }} 
+                  | 临时: {{ ability.tempValue || 0 }}
+                  | 总值: {{ ability.totalValue || ability.currentValue }}/10
+                </span>
               </div>
               
               <!-- 电池格显示 -->
@@ -213,7 +211,7 @@
                     @click="selectAbilityPoint(index, i)"
                   ></div>
                 </div>
-                <span class="ability-score">{{ ability.currentValue }}/10</span>
+                <span class="ability-score">{{ ability.totalValue || ability.currentValue }}/10</span>
               </div>
               
               <!-- 分配点数输入 -->
@@ -316,8 +314,8 @@ import Footer from '@/components/Footer.vue'
 import ExaminerWelcome from '@/components/Welcome/ExaminerWelcome.vue'
 import examinerService from '@/services/examinerService'
 import authService from '@/services/authService'
+import { supabase } from '@/lib/supabase.client'
 
-const showCreateTask = ref(false)
 const showAssignAbilityModal = ref(false)
 const showConfirmDialog = ref(false)
 const showTeacherKeyModal = ref(false)
@@ -325,11 +323,6 @@ const teacherKey = ref<any>(null)
 const loading = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
-const newTask = ref({
-  title: '',
-  description: '',
-  reward: 4
-})
 
 // 分页相关
 const currentPage = ref(1)
@@ -337,19 +330,27 @@ const pageSize = 7
 
 // 学生能力数据
 const abilities = ref([
-  { name: '前端开发', icon: '💻', currentValue: 0, assignedPoints: 0 },
-  { name: '安卓开发', icon: '📱', currentValue: 0, assignedPoints: 0 },
-  { name: '后端开发', icon: '⚙️', currentValue: 0, assignedPoints: 0 },
-  { name: '人工智能', icon: '🤖', currentValue: 0, assignedPoints: 0 },
-  { name: '沟通能力', icon: '💬', currentValue: 0, assignedPoints: 0 },
-  { name: '创造力', icon: '💡', currentValue: 0, assignedPoints: 0 },
-  { name: '领导力', icon: '👑', currentValue: 0, assignedPoints: 0 }
+  { name: '前端开发', icon: '💻', currentValue: 0, tempValue: 0, totalValue: 0, assignedPoints: 0 },
+  { name: '安卓开发', icon: '📱', currentValue: 0, tempValue: 0, totalValue: 0, assignedPoints: 0 },
+  { name: '后端开发', icon: '⚙️', currentValue: 0, tempValue: 0, totalValue: 0, assignedPoints: 0 },
+  { name: '人工智能', icon: '🤖', currentValue: 0, tempValue: 0, totalValue: 0, assignedPoints: 0 },
+  { name: '沟通能力', icon: '💬', currentValue: 0, tempValue: 0, totalValue: 0, assignedPoints: 0 },
+  { name: '创造力', icon: '💡', currentValue: 0, tempValue: 0, totalValue: 0, assignedPoints: 0 },
+  { name: '领导力', icon: '👑', currentValue: 0, tempValue: 0, totalValue: 0, assignedPoints: 0 }
 ])
 
 const tasks = ref([
-  { id: 1, title: '前端项目开发', description: '完成一个Vue.js项目', participants: 5, reward: 4, status: 'active', statusText: '进行中' },
-  { id: 2, title: '算法练习题', description: '完成10道算法题目', participants: 3, reward: 2, status: 'completed', statusText: '已完成' }
+  { id: 1, title: '前端项目开发', description: '完成一个Vue.js项目', participants: 5, reward: 4, status: 'active', statusText: '进行中', createdAt: new Date('2024-01-15') },
+  { id: 2, title: '算法练习题', description: '完成10道算法题目', participants: 3, reward: 2, status: 'completed', statusText: '已完成', createdAt: new Date('2024-01-10') },
+  { id: 3, title: '数据库设计', description: '设计一个关系型数据库', participants: 2, reward: 3, status: 'active', statusText: '进行中', createdAt: new Date('2024-01-05') }
 ])
+
+// 只显示最新的2个任务
+const latestTasks = computed(() => {
+  return tasks.value
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 2)
+})
 
 const students = ref<any[]>([
   { id: 1, username: '张三', email: 'zhangsan@example.com', remainingPoints: 15, studentStatus: 'selected' },
@@ -407,16 +408,23 @@ const canAssign = computed(() => {
   return totalAssignedPoints.value > 0 && totalAssignedPoints.value <= (selectedStudent.value?.remainingPoints || 0)
 })
 
-// 电池格交互逻辑
+// 电池格交互逻辑（支持基础值、临时值和分配值）
 const getBatteryCellClass = (ability: any, abilityIndex: number, pointValue: number) => {
   const classes = []
+  const baseValue = ability.currentValue || 0
+  const tempValue = ability.tempValue || 0
+  const totalValue = ability.totalValue || baseValue
   
-  // 基础状态：已分配的点数显示绿色
-  if (pointValue <= ability.currentValue) {
-    classes.push('active') // 已分配的点数
+  // 基础状态：基础值显示绿色
+  if (pointValue <= baseValue) {
+    classes.push('active') // 基础值（永久分配）
   } 
+  // 临时值显示黄色
+  else if (pointValue > baseValue && pointValue <= totalValue) {
+    classes.push('temp') // 临时点数
+  }
   // 新增分配的点数显示蓝色
-  else if (pointValue > ability.currentValue && pointValue <= ability.currentValue + ability.assignedPoints) {
+  else if (pointValue > totalValue && pointValue <= totalValue + ability.assignedPoints) {
     classes.push('assigned') // 新增分配的点数
   }
   // 未分配的点数显示灰色
@@ -426,10 +434,10 @@ const getBatteryCellClass = (ability: any, abilityIndex: number, pointValue: num
   
   // 悬停状态
   if (hoveredAbility.value.abilityIndex === abilityIndex && 
-      pointValue > ability.currentValue + ability.assignedPoints && 
+      pointValue > totalValue + ability.assignedPoints && 
       pointValue <= hoveredAbility.value.pointValue) {
     
-    const diff = pointValue - (ability.currentValue + ability.assignedPoints)
+    const diff = pointValue - (totalValue + ability.assignedPoints)
     const remainingPoints = selectedStudent.value?.remainingPoints || 0
     
     if (diff <= remainingPoints) {
@@ -468,18 +476,13 @@ const loadStudents = async () => {
       const studentsWithPoints = await Promise.all(
         response.data.students.map(async (student: any) => {
           try {
-            // 获取学生的能力数据来计算已分配点数
-            const abilityResponse = await examinerService.getStudentAbilities(student.id)
-            let totalAssignedPoints = 0
+            // 获取学生的实际能力数据（包含基础值和临时值）
+            const abilityResponse = await examinerService.getStudentActualAbilities(student.id)
             
-            if (abilityResponse.success && abilityResponse.data.abilities) {
-              totalAssignedPoints = abilityResponse.data.abilities.reduce((total: number, ability: any) => {
-                return total + (ability.value || 0)
-              }, 0)
-            }
-            
-            // 计算剩余点数：初始10点减去已分配点数
-            const remainingPoints = 10 - totalAssignedPoints
+            // 使用RPC函数返回的剩余总点数（包含general类型的点数）
+            const remainingPoints = abilityResponse.success ? 
+              (abilityResponse.data.remainingPoints !== undefined && abilityResponse.data.remainingPoints !== null ? 
+                abilityResponse.data.remainingPoints : 10) : 10
             
             return {
               ...student,
@@ -503,23 +506,27 @@ const loadStudents = async () => {
   }
 }
 
-// 加载学生能力数据
+// 加载学生能力数据（包含基础值和临时值）
 const loadStudentAbilities = async (studentId: string) => {
   try {
-    // 使用examinerService获取学生能力数据
-    const response = await examinerService.getStudentAbilities(studentId)
+    // 使用examinerService调用新的RPC函数获取学生实际能力数据（包含基础值和临时值）
+    const response = await examinerService.getStudentActualAbilities(studentId)
     
     if (response.success) {
-      // 更新能力显示
-      updateAbilityDisplayFromResponse(response.data.abilities)
+      // 更新能力显示，包含基础值、临时值和总值
+      updateAbilityDisplayWithTempPoints(response.data.abilities)
     } else {
-      console.warn('获取学生能力数据失败:', response.message)
-      // 使用默认能力值
-      resetToDefaultAbilities()
+      console.warn('获取学生能力数据失败，使用旧方法:', response.message)
+      // 回退到旧方法
+      const oldResponse = await examinerService.getStudentAbilities(studentId)
+      if (oldResponse.success) {
+        updateAbilityDisplayFromResponse(oldResponse.data.abilities)
+      } else {
+        resetToDefaultAbilities()
+      }
     }
   } catch (error) {
     console.error('加载学生能力数据失败:', error)
-    // 使用默认能力值
     resetToDefaultAbilities()
   }
 }
@@ -541,6 +548,30 @@ const updateAbilityDisplayFromResponse = (abilitiesData: any[]) => {
   })
   
   console.log('更新后的能力数据:', abilities.value)
+}
+
+// 更新能力显示（包含基础值、临时值和总值）
+const updateAbilityDisplayWithTempPoints = (abilitiesArray: any[]) => {
+  console.log('更新能力显示（包含临时点数）:', abilitiesArray)
+  
+  abilities.value = abilities.value.map(ability => {
+    // 在数组中查找对应的能力数据
+    const abilityData = abilitiesArray.find((item: any) => item.name === ability.name)
+    
+    if (abilityData) {
+      return {
+        ...ability,
+        value: abilityData.value || 0,
+        tempValue: abilityData.tempValue || 0,
+        totalValue: abilityData.totalValue || 0
+      }
+    }
+    
+    // 如果没有找到对应的数据，保持原值
+    return ability
+  })
+  
+  console.log('更新后的能力数据（包含临时点数）:', abilities.value)
 }
 
 // 更新能力显示（从数据库原始数据）
@@ -586,7 +617,9 @@ const updateAbilityDisplay = (abilityData: any) => {
 const resetToDefaultAbilities = () => {
   abilities.value = abilities.value.map(ability => ({
     ...ability,
-    currentValue: 0
+    currentValue: 0,
+    tempValue: 0,
+    totalValue: 0
   }))
 }
 
@@ -650,10 +683,11 @@ const closeAssignAbilityModal = () => {
   document.body.classList.remove('modal-open')
 }
 
-// 选择能力点数
+// 选择能力点数（基于总值，包括临时点数）
 const selectAbilityPoint = (abilityIndex: number, pointValue: number) => {
   const ability = abilities.value[abilityIndex]
-  const maxAssignable = pointValue - ability.currentValue
+  const totalValue = ability.totalValue || ability.currentValue
+  const maxAssignable = pointValue - totalValue
   
   if (maxAssignable > 0 && maxAssignable <= (selectedStudent.value?.remainingPoints || 0)) {
     ability.assignedPoints = maxAssignable
@@ -698,32 +732,32 @@ const executeAssignment = async () => {
       throw new Error(`分配点数(${totalAssignedPoints.value})超过剩余可分配点数(${selectedStudent.value.remainingPoints})`)
     }
 
-    // 构建能力数据更新对象
+    // 构建能力数据更新对象 - 改为增量式分配
     const abilityUpdates: any = {}
     abilities.value.forEach(ability => {
       if (ability.assignedPoints > 0) {
-        // 根据能力名称映射到数据库字段
+        // 根据能力名称映射到数据库字段 - 传递增量值而不是绝对值
         switch (ability.name) {
           case '前端开发':
-            abilityUpdates.frontend_points = ability.currentValue + ability.assignedPoints
+            abilityUpdates.frontend_points = ability.assignedPoints // 只传递增量值
             break
           case '安卓开发':
-            abilityUpdates.android_points = ability.currentValue + ability.assignedPoints
+            abilityUpdates.android_points = ability.assignedPoints // 只传递增量值
             break
           case '后端开发':
-            abilityUpdates.backend_points = ability.currentValue + ability.assignedPoints
+            abilityUpdates.backend_points = ability.assignedPoints // 只传递增量值
             break
           case '人工智能':
-            abilityUpdates.ai_points = ability.currentValue + ability.assignedPoints
+            abilityUpdates.ai_points = ability.assignedPoints // 只传递增量值
             break
           case '沟通能力':
-            abilityUpdates.communication_points = ability.currentValue + ability.assignedPoints
+            abilityUpdates.communication_points = ability.assignedPoints // 只传递增量值
             break
           case '创造力':
-            abilityUpdates.creativity_points = ability.currentValue + ability.assignedPoints
+            abilityUpdates.creativity_points = ability.assignedPoints // 只传递增量值
             break
           case '领导力':
-            abilityUpdates.leadership_points = ability.currentValue + ability.assignedPoints
+            abilityUpdates.leadership_points = ability.assignedPoints // 只传递增量值
             break
         }
       }
@@ -750,7 +784,11 @@ const executeAssignment = async () => {
         students.value[studentIndex].remainingPoints = response.data.remainingPoints
       }
       
-      successMessage.value = `成功为 ${selectedStudent.value.username} 分配了 ${totalAssignedPoints.value} 点能力！剩余点数: ${response.data.remainingPoints}点`
+      // 计算临时点数信息
+      const tempPointsInfo = abilities.value.reduce((total, ability) => total + (ability.tempValue || 0), 0)
+      const tempPointsText = tempPointsInfo > 0 ? `（包含临时点数: ${tempPointsInfo}点）` : ''
+      
+      successMessage.value = `成功为 ${selectedStudent.value.username} 分配了 ${totalAssignedPoints.value} 点能力！${tempPointsText}`
       closeAssignAbilityModal()
     } else {
       throw new Error(response.message)
@@ -825,16 +863,40 @@ const copyKey = async (keyValue: string) => {
   }
 }
 
-const createTask = () => {
-  tasks.value.push({
-    id: tasks.value.length + 1,
-    ...newTask.value,
-    participants: 0,
-    status: 'active',
-    statusText: '进行中'
-  })
-  showCreateTask.value = false
-  newTask.value = { title: '', description: '', reward: 4 }
+// 加载任务列表
+const loadTasks = async () => {
+  try {
+    const response = await examinerService.getExaminerTasks()
+    if (response.success && response.data.tasks) {
+      tasks.value = response.data.tasks
+        .map((task: any) => ({
+          id: task.id,
+          title: task.title,
+          description: task.description,
+          participants: task.participants || 0,
+          completedParticipants: task.completedParticipants || 0,
+          pendingReviews: task.pendingReviews || 0,
+          reward: task.reward_points,
+          status: task.status,
+          statusText: getTaskStatusText(task.status),
+          createdAt: new Date(task.created_at)
+        }))
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    }
+  } catch (error) {
+    console.error('加载任务列表失败:', error)
+  }
+}
+
+// 获取任务状态文本
+const getTaskStatusText = (status: string) => {
+  const statusMap = {
+    'open': '开放中',
+    'in_progress': '进行中',
+    'completed': '已完成',
+    'closed': '已关闭'
+  }
+  return statusMap[status as keyof typeof statusMap] || '未知'
 }
 
 const reviewTask = (task: any) => {
@@ -845,9 +907,10 @@ const editTask = (task: any) => {
   alert(`编辑任务: ${task.title}`)
 }
 
-// 组件挂载时加载学生列表
+// 组件挂载时加载学生列表和任务列表
 onMounted(async () => {
   await loadStudents()
+  await loadTasks()
 })
 </script>
 
@@ -1075,6 +1138,13 @@ onMounted(async () => {
   padding: 25px;
 }
 
+.bulletin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
 .task-list {
   display: flex;
   flex-direction: column;
@@ -1299,6 +1369,12 @@ onMounted(async () => {
 .battery-cell.active {
   background: #4caf50;
   border-color: #388e3c;
+}
+
+/* 临时点数 - 黄色 */
+.battery-cell.temp {
+  background: #ffc107;
+  border-color: #ffa000;
 }
 
 /* 新增分配的点数 - 蓝色 */

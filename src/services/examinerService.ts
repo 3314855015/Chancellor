@@ -404,13 +404,17 @@ export const bindStudentTeacher = async (keyValue: string, studentId: string): P
 }
 
 /**
- * 获取学生能力数据（教师视角）
+ * 获取学生实际能力数据（包含基础值和临时值）
  */
-export const getStudentAbilities = async (studentId: string): Promise<{
+export const getStudentActualAbilities = async (studentId: string): Promise<{
   success: boolean
   message: string
   data: {
-    abilities: AbilityInfo[]
+    abilities: any[]
+    remainingBasePoints: number
+    remainingPoints: number
+    remainingTotalPoints: number
+    generalPoints: number
   }
 }> => {
   try {
@@ -419,7 +423,215 @@ export const getStudentAbilities = async (studentId: string): Promise<{
       return {
         success: false,
         message: '用户未登录',
-        data: { abilities: [] }
+        data: { abilities: [], remainingBasePoints: 0, remainingPoints: 0, remainingTotalPoints: 0, generalPoints: 0 }
+      }
+    }
+
+    // 使用RPC函数获取学生实际能力数据（包含基础值和临时值）
+    const response = await supabase.rpc('get_student_actual_abilities', { p_user_id: studentId });
+    
+    // 使用新的RPC函数获取有效的general点数
+    const abilityRecordsResponse = await supabase.rpc('get_ability_records', { p_user_id: studentId });
+    
+    const { data, error } = response;
+    const { data: abilityRecordsData, error: abilityRecordsError } = abilityRecordsResponse;
+    
+    if (error) {
+      console.warn('获取学生实际能力数据失败:', error)
+      // 回退到旧方法，并包装返回类型
+      const result = await getStudentAbilities(studentId)
+      return {
+        ...result,
+        data: {
+          ...result.data,
+          remainingBasePoints: 0
+        }
+      }
+    }
+    
+    if (data) {
+      // RPC函数返回的是嵌套的数据结构      
+      // 解析嵌套结构 - 检查不同的返回格式
+      let rpcData = null
+      
+      // 解析 Supabase RPC 返回的双层嵌套结构
+      // Supabase RPC 返回格式: {data: {success: true, data: {...}}, error: null}
+      if (data.success !== undefined && data.data) {
+        // 格式1: 双层嵌套结构 - data.data 包含实际数据
+        rpcData = data.data
+      } else if (data.base_abilities || data.general_points !== undefined) {
+        // 格式2: 直接包含数据字段
+        rpcData = data
+      } else if (data.data) {
+        // 格式3: 单层嵌套结构
+        rpcData = data.data
+      } else {
+        // 格式4: 其他格式，尝试直接使用
+        rpcData = data
+      }
+      
+      if (!rpcData) {
+        console.warn('RPC返回数据格式不正确，使用默认值')
+        // 回退到旧方法
+        const result = await getStudentAbilities(studentId)
+        return {
+          ...result,
+          data: {
+            ...result.data,
+            remainingBasePoints: 0
+          }
+        }
+      }
+      
+      // 解析ability records数据获取有效的general点数
+      let actualGeneralPoints = rpcData.general_points || 0;
+      if (abilityRecordsData && abilityRecordsData.success && abilityRecordsData.data) {
+        // 使用新的RPC函数返回的general点数
+        actualGeneralPoints = abilityRecordsData.data.general_points || 0;
+        console.log('使用新的RPC函数获取的general点数:', actualGeneralPoints);
+      } else if (abilityRecordsError) {
+        console.warn('获取ability records失败，使用默认值:', abilityRecordsError);
+      }
+      
+      // 将对象格式转换为前端需要的数组格式
+      const abilitiesArray = [
+        {
+          type: 'frontend',
+          name: '前端开发',
+          value: rpcData.base_abilities?.frontend_points || 0,
+          tempValue: rpcData.temp_abilities?.frontend_points || 0,
+          totalValue: rpcData.total_abilities?.frontend_points || 0
+        },
+        {
+          type: 'android',
+          name: '安卓开发',
+          value: rpcData.base_abilities?.android_points || 0,
+          tempValue: rpcData.temp_abilities?.android_points || 0,
+          totalValue: rpcData.total_abilities?.android_points || 0
+        },
+        {
+          type: 'backend',
+          name: '后端开发',
+          value: rpcData.base_abilities?.backend_points || 0,
+          tempValue: rpcData.temp_abilities?.backend_points || 0,
+          totalValue: rpcData.total_abilities?.backend_points || 0
+        },
+        {
+          type: 'ai',
+          name: '人工智能',
+          value: rpcData.base_abilities?.ai_points || 0,
+          tempValue: rpcData.temp_abilities?.ai_points || 0,
+          totalValue: rpcData.total_abilities?.ai_points || 0
+        },
+        {
+          type: 'communication',
+          name: '沟通能力',
+          value: rpcData.base_abilities?.communication_points || 0,
+          tempValue: rpcData.temp_abilities?.communication_points || 0,
+          totalValue: rpcData.total_abilities?.communication_points || 0
+        },
+        {
+          type: 'creativity',
+          name: '创造力',
+          value: rpcData.base_abilities?.creativity_points || 0,
+          tempValue: rpcData.temp_abilities?.creativity_points || 0,
+          totalValue: rpcData.total_abilities?.creativity_points || 0
+        },
+        {
+          type: 'leadership',
+          name: '领导力',
+          value: rpcData.base_abilities?.leadership_points || 0,
+          tempValue: rpcData.temp_abilities?.leadership_points || 0,
+          totalValue: rpcData.total_abilities?.leadership_points || 0
+        }
+      ]
+      
+      // 重新计算剩余点数，使用实际的general点数
+      const baseTotal = (rpcData.base_abilities?.frontend_points || 0) +
+                       (rpcData.base_abilities?.android_points || 0) +
+                       (rpcData.base_abilities?.backend_points || 0) +
+                       (rpcData.base_abilities?.ai_points || 0) +
+                       (rpcData.base_abilities?.communication_points || 0) +
+                       (rpcData.base_abilities?.creativity_points || 0) +
+                       (rpcData.base_abilities?.leadership_points || 0);
+      
+      const tempTotal = (rpcData.temp_abilities?.frontend_points || 0) +
+                        (rpcData.temp_abilities?.android_points || 0) +
+                        (rpcData.temp_abilities?.backend_points || 0) +
+                        (rpcData.temp_abilities?.ai_points || 0) +
+                        (rpcData.temp_abilities?.communication_points || 0) +
+                        (rpcData.temp_abilities?.creativity_points || 0) +
+                        (rpcData.temp_abilities?.leadership_points || 0);
+      
+      const remainingBasePoints = Math.max(0, 10 - baseTotal);
+      const remainingTotalPoints = Math.max(0, 10 + actualGeneralPoints - (baseTotal + tempTotal));
+      
+      console.log('修正后的剩余点数计算:', {
+        baseTotal,
+        tempTotal,
+        actualGeneralPoints,
+        remainingBasePoints,
+        remainingTotalPoints
+      })
+      
+      return {
+        success: true,
+        message: '获取学生能力数据成功',
+        data: { 
+          abilities: abilitiesArray,
+          remainingBasePoints: remainingBasePoints,
+          remainingPoints: remainingTotalPoints,
+          remainingTotalPoints: remainingTotalPoints,
+          generalPoints: actualGeneralPoints
+        }
+      }
+    } else {
+      console.warn('获取学生能力数据失败:', data?.message)
+      // 回退到旧方法，并包装返回类型
+      const result = await getStudentAbilities(studentId)
+      return {
+        ...result,
+        data: {
+          ...result.data,
+          remainingBasePoints: 0
+        }
+      }
+    }
+  } catch (error) {
+    console.error('获取学生实际能力数据失败:', error)
+    // 回退到旧方法，并包装返回类型
+    const result = await getStudentAbilities(studentId)
+    return {
+      ...result,
+      data: {
+        ...result.data,
+        remainingBasePoints: 0
+      }
+    }
+  }
+}
+
+/**
+ * 获取学生能力数据（教师视角）
+ */
+export const getStudentAbilities = async (studentId: string): Promise<{
+  success: boolean
+  message: string
+  data: {
+    abilities: AbilityInfo[]
+    remainingBasePoints: number
+    remainingPoints: number
+    remainingTotalPoints: number
+    generalPoints: number
+  }
+}> => {
+  try {
+    const currentUser = authService.getCurrentUser()
+    if (!currentUser) {
+      return {
+        success: false,
+        message: '用户未登录',
+        data: { abilities: [], remainingBasePoints: 0, remainingPoints: 0, remainingTotalPoints: 0, generalPoints: 0 }
       }
     }
 
@@ -496,7 +708,7 @@ export const getStudentAbilities = async (studentId: string): Promise<{
       return {
         success: true,
         message: '获取学生能力数据成功',
-        data: { abilities }
+        data: { abilities, remainingBasePoints: 0, remainingPoints: 0, remainingTotalPoints: 0, generalPoints: 0 }
       }
     }
 
@@ -504,14 +716,14 @@ export const getStudentAbilities = async (studentId: string): Promise<{
     return {
       success: true,
       message: '获取学生能力数据成功（使用默认值）',
-      data: { abilities: defaultAbilities }
+      data: { abilities: defaultAbilities, remainingBasePoints: 0, remainingPoints: 0, remainingTotalPoints: 0, generalPoints: 0 }
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : '获取学生能力数据失败'
     return {
       success: false,
       message,
-      data: { abilities: [] }
+      data: { abilities: [], remainingBasePoints: 0, remainingPoints: 0, remainingTotalPoints: 0, generalPoints: 0 }
     }
   }
 }
@@ -524,6 +736,10 @@ const getStudentAbilitiesWithCustomAuth = async (studentId: string): Promise<{
   message: string
   data: {
     abilities: AbilityInfo[]
+    remainingBasePoints: number
+    remainingPoints: number
+    remainingTotalPoints: number
+    generalPoints: number
   }
 }> => {
   try {
@@ -550,7 +766,7 @@ const getStudentAbilitiesWithCustomAuth = async (studentId: string): Promise<{
       return {
         success: true,
         message: '获取学生能力数据成功',
-        data: { abilities }
+        data: { abilities, remainingBasePoints: 0, remainingPoints: 0, remainingTotalPoints: 0, generalPoints: 0 }
       }
     } else {
       console.warn('RPC查询学生能力数据失败:', error)
@@ -568,7 +784,7 @@ const getStudentAbilitiesWithCustomAuth = async (studentId: string): Promise<{
       return {
         success: true,
         message: '获取学生能力数据成功（使用默认值）',
-        data: { abilities: defaultAbilities }
+        data: { abilities: defaultAbilities, remainingBasePoints: 0, remainingPoints: 0, remainingTotalPoints: 0, generalPoints: 0 }
       }
     }
   } catch (error) {
@@ -577,13 +793,13 @@ const getStudentAbilitiesWithCustomAuth = async (studentId: string): Promise<{
     return {
       success: false,
       message,
-      data: { abilities: [] }
+      data: { abilities: [], remainingBasePoints: 0, remainingPoints: 0, remainingTotalPoints: 0, generalPoints: 0 }
     }
   }
 }
 
 /**
- * 分配学生能力点数
+ * 分配学生能力点数（使用追踪功能）
  */
 export const assignStudentAbilities = async (studentId: string, abilityUpdates: any): Promise<{
   success: boolean
@@ -645,33 +861,108 @@ export const assignStudentAbilities = async (studentId: string, abilityUpdates: 
       throw new Error(`分配点数超过限制：总点数 ${totalPoints} 超过10点限制`)
     }
 
-    // 使用RPC函数更新能力数据，绕过RLS限制
-    const { data: rpcResult, error } = await supabase
-      .rpc('update_user_abilities', {
-        p_user_id: studentId,
-        p_frontend_points: abilityUpdates.frontend_points || 0,
-        p_android_points: abilityUpdates.android_points || 0,
-        p_backend_points: abilityUpdates.backend_points || 0,
-        p_ai_points: abilityUpdates.ai_points || 0,
-        p_communication_points: abilityUpdates.communication_points || 0,
-        p_creativity_points: abilityUpdates.creativity_points || 0,
-        p_leadership_points: abilityUpdates.leadership_points || 0
+    // 使用新的追踪功能分配能力点数
+    // 为每个分配的能力类型单独调用RPC函数
+    const allocationResults = []
+    
+    // 前端开发能力分配
+    if (abilityUpdates.frontend_points && abilityUpdates.frontend_points > 0) {
+      const result = await supabase.rpc('assign_ability_points_with_tracking', {
+        p_teacher_id: currentUser.id,
+        p_student_id: studentId,
+        p_ability_type: 'frontend',
+        p_points: abilityUpdates.frontend_points,
+        p_expires_in_months: 6 // 默认6个月过期
       })
-
-    if (error) {
-      throw new Error(`RPC函数调用失败: ${error.message}`)
+      allocationResults.push(result)
+    }
+    
+    // 安卓开发能力分配
+    if (abilityUpdates.android_points && abilityUpdates.android_points > 0) {
+      const result = await supabase.rpc('assign_ability_points_with_tracking', {
+        p_teacher_id: currentUser.id,
+        p_student_id: studentId,
+        p_ability_type: 'android',
+        p_points: abilityUpdates.android_points,
+        p_expires_in_months: 6
+      })
+      allocationResults.push(result)
+    }
+    
+    // 后端开发能力分配
+    if (abilityUpdates.backend_points && abilityUpdates.backend_points > 0) {
+      const result = await supabase.rpc('assign_ability_points_with_tracking', {
+        p_teacher_id: currentUser.id,
+        p_student_id: studentId,
+        p_ability_type: 'backend',
+        p_points: abilityUpdates.backend_points,
+        p_expires_in_months: 6
+      })
+      allocationResults.push(result)
+    }
+    
+    // 人工智能能力分配
+    if (abilityUpdates.ai_points && abilityUpdates.ai_points > 0) {
+      const result = await supabase.rpc('assign_ability_points_with_tracking', {
+        p_teacher_id: currentUser.id,
+        p_student_id: studentId,
+        p_ability_type: 'ai',
+        p_points: abilityUpdates.ai_points,
+        p_expires_in_months: 6
+      })
+      allocationResults.push(result)
+    }
+    
+    // 沟通能力分配
+    if (abilityUpdates.communication_points && abilityUpdates.communication_points > 0) {
+      const result = await supabase.rpc('assign_ability_points_with_tracking', {
+        p_teacher_id: currentUser.id,
+        p_student_id: studentId,
+        p_ability_type: 'communication',
+        p_points: abilityUpdates.communication_points,
+        p_expires_in_months: 6
+      })
+      allocationResults.push(result)
+    }
+    
+    // 创造力分配
+    if (abilityUpdates.creativity_points && abilityUpdates.creativity_points > 0) {
+      const result = await supabase.rpc('assign_ability_points_with_tracking', {
+        p_teacher_id: currentUser.id,
+        p_student_id: studentId,
+        p_ability_type: 'creativity',
+        p_points: abilityUpdates.creativity_points,
+        p_expires_in_months: 6
+      })
+      allocationResults.push(result)
+    }
+    
+    // 领导力分配
+    if (abilityUpdates.leadership_points && abilityUpdates.leadership_points > 0) {
+      const result = await supabase.rpc('assign_ability_points_with_tracking', {
+        p_teacher_id: currentUser.id,
+        p_student_id: studentId,
+        p_ability_type: 'leadership',
+        p_points: abilityUpdates.leadership_points,
+        p_expires_in_months: 6
+      })
+      allocationResults.push(result)
     }
 
-    // 解析RPC返回结果 
-    if (rpcResult && !rpcResult.success) {
-      throw new Error(`能力数据更新失败: ${rpcResult.message}`)
+    // 检查是否有分配失败的情况
+    const failedAllocations = allocationResults.filter(result => 
+      result.error || (result.data && !result.data.success)
+    )
+    
+    if (failedAllocations.length > 0) {
+      throw new Error(`部分能力分配失败，请重试`)
     }
 
     const remainingPoints = 10 - totalPoints
 
     return {
       success: true,
-      message: '能力分配成功',
+      message: '能力分配成功（已启用追踪功能）',
       data: {
         remainingPoints
       }
@@ -689,7 +980,7 @@ export const assignStudentAbilities = async (studentId: string, abilityUpdates: 
 }
 
 /**
- * 使用自定义认证方式分配学生能力点数
+ * 使用自定义认证方式分配学生能力点数（使用追踪功能）
  */
 const assignStudentAbilitiesWithCustomAuth = async (studentId: string, abilityUpdates: any): Promise<{
   success: boolean
@@ -699,6 +990,11 @@ const assignStudentAbilitiesWithCustomAuth = async (studentId: string, abilityUp
   }
 }> => {
   try {
+    const currentUser = authService.getCurrentUser()
+    if (!currentUser) {
+      throw new Error('用户未登录')
+    }
+
     // 计算总分配点数
     const totalPoints = (abilityUpdates.frontend_points || 0) +
                         (abilityUpdates.android_points || 0) +
@@ -713,26 +1009,101 @@ const assignStudentAbilitiesWithCustomAuth = async (studentId: string, abilityUp
       throw new Error(`分配点数超过限制：总点数 ${totalPoints} 超过10点限制`)
     }
 
-    // 使用RPC函数更新能力数据，绕过RLS限制
-    const { data: rpcResult, error } = await supabase
-      .rpc('update_user_abilities', {
-        p_user_id: studentId,
-        p_frontend_points: abilityUpdates.frontend_points || 0,
-        p_android_points: abilityUpdates.android_points || 0,
-        p_backend_points: abilityUpdates.backend_points || 0,
-        p_ai_points: abilityUpdates.ai_points || 0,
-        p_communication_points: abilityUpdates.communication_points || 0,
-        p_creativity_points: abilityUpdates.creativity_points || 0,
-        p_leadership_points: abilityUpdates.leadership_points || 0
+    // 使用新的追踪功能分配能力点数
+    // 为每个分配的能力类型单独调用RPC函数
+    const allocationResults = []
+    
+    // 前端开发能力分配
+    if (abilityUpdates.frontend_points && abilityUpdates.frontend_points > 0) {
+      const result = await supabase.rpc('assign_ability_points_with_tracking', {
+        p_teacher_id: currentUser.id,
+        p_student_id: studentId,
+        p_ability_type: 'frontend',
+        p_points: abilityUpdates.frontend_points,
+        p_expires_in_months: 6 // 默认6个月过期
       })
-
-    if (error) {
-      throw new Error(`RPC函数调用失败: ${error.message}`)
+      allocationResults.push(result)
+    }
+    
+    // 安卓开发能力分配
+    if (abilityUpdates.android_points && abilityUpdates.android_points > 0) {
+      const result = await supabase.rpc('assign_ability_points_with_tracking', {
+        p_teacher_id: currentUser.id,
+        p_student_id: studentId,
+        p_ability_type: 'android',
+        p_points: abilityUpdates.android_points,
+        p_expires_in_months: 6
+      })
+      allocationResults.push(result)
+    }
+    
+    // 后端开发能力分配
+    if (abilityUpdates.backend_points && abilityUpdates.backend_points > 0) {
+      const result = await supabase.rpc('assign_ability_points_with_tracking', {
+        p_teacher_id: currentUser.id,
+        p_student_id: studentId,
+        p_ability_type: 'backend',
+        p_points: abilityUpdates.backend_points,
+        p_expires_in_months: 6
+      })
+      allocationResults.push(result)
+    }
+    
+    // 人工智能能力分配
+    if (abilityUpdates.ai_points && abilityUpdates.ai_points > 0) {
+      const result = await supabase.rpc('assign_ability_points_with_tracking', {
+        p_teacher_id: currentUser.id,
+        p_student_id: studentId,
+        p_ability_type: 'ai',
+        p_points: abilityUpdates.ai_points,
+        p_expires_in_months: 6
+      })
+      allocationResults.push(result)
+    }
+    
+    // 沟通能力分配
+    if (abilityUpdates.communication_points && abilityUpdates.communication_points > 0) {
+      const result = await supabase.rpc('assign_ability_points_with_tracking', {
+        p_teacher_id: currentUser.id,
+        p_student_id: studentId,
+        p_ability_type: 'communication',
+        p_points: abilityUpdates.communication_points,
+        p_expires_in_months: 6
+      })
+      allocationResults.push(result)
+    }
+    
+    // 创造力分配
+    if (abilityUpdates.creativity_points && abilityUpdates.creativity_points > 0) {
+      const result = await supabase.rpc('assign_ability_points_with_tracking', {
+        p_teacher_id: currentUser.id,
+        p_student_id: studentId,
+        p_ability_type: 'creativity',
+        p_points: abilityUpdates.creativity_points,
+        p_expires_in_months: 6
+      })
+      allocationResults.push(result)
+    }
+    
+    // 领导力分配
+    if (abilityUpdates.leadership_points && abilityUpdates.leadership_points > 0) {
+      const result = await supabase.rpc('assign_ability_points_with_tracking', {
+        p_teacher_id: currentUser.id,
+        p_student_id: studentId,
+        p_ability_type: 'leadership',
+        p_points: abilityUpdates.leadership_points,
+        p_expires_in_months: 6
+      })
+      allocationResults.push(result)
     }
 
-    // 解析RPC返回结果
-    if (rpcResult && !rpcResult.success) {
-      throw new Error(`能力数据更新失败: ${rpcResult.message}`)
+    // 检查是否有分配失败的情况
+    const failedAllocations = allocationResults.filter(result => 
+      result.error || (result.data && !result.data.success)
+    )
+    
+    if (failedAllocations.length > 0) {
+      throw new Error(`部分能力分配失败，请重试`)
     }
 
     // 计算剩余点数
@@ -740,7 +1111,7 @@ const assignStudentAbilitiesWithCustomAuth = async (studentId: string, abilityUp
 
     return {
       success: true,
-      message: '能力分配成功',
+      message: '能力分配成功（已启用追踪功能）',
       data: {
         remainingPoints
       }
@@ -758,11 +1129,682 @@ const assignStudentAbilitiesWithCustomAuth = async (studentId: string, abilityUp
   }
 }
 
+/**
+ * 获取考官发布的任务列表（包含统计信息）
+ */
+export const getExaminerTasks = async (): Promise<{
+  success: boolean
+  message: string
+  data: {
+    tasks: any[]
+  }
+}> => {
+  try {
+    const currentUser = authService.getCurrentUser()
+    if (!currentUser) {
+      return {
+        success: false,
+        message: '用户未登录',
+        data: {
+          tasks: []
+        }
+      }
+    }
+
+    // 首先检查Supabase认证状态，如果没有认证则设置认证
+    const { data: sessionData } = await supabase.auth.getSession()
+    if (!sessionData.session) {
+      console.warn('Supabase会话未认证，尝试设置认证')
+      
+      // 获取当前用户的认证token
+      const token = authService.getToken()
+      if (token) {
+        // 设置Supabase认证会话
+        const { data: signInData, error: signInError } = await supabase.auth.setSession({
+          access_token: token,
+          refresh_token: ''
+        })
+        
+        if (signInError) {
+          console.warn('设置Supabase会话失败:', signInError)
+          // 尝试使用RPC函数绕过认证
+          return await getExaminerTasksWithRPC(currentUser.id)
+        }
+        
+        console.log('Supabase会话设置成功')
+      } else {
+        console.warn('没有认证token，使用RPC函数')
+        return await getExaminerTasksWithRPC(currentUser.id)
+      }
+    }
+
+    // 查询当前考官发布的任务，并关联任务分配表获取统计信息
+    const { data: tasks, error } = await supabase
+      .from('tasks')
+      .select(`
+        *,
+        task_assignments (
+          id,
+          status,
+          submitted_at,
+          reviewed_at
+        )
+      `)
+      .eq('examiner_id', currentUser.id)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.warn('直接查询失败，尝试使用RPC函数:', error)
+      return await getExaminerTasksWithRPC(currentUser.id)
+    }
+
+    // 处理任务数据，添加统计信息
+    const processedTasks = (tasks || []).map(task => {
+      const assignments = task.task_assignments || []
+      
+      // 计算统计信息
+      const participants = assignments.length
+      const completedParticipants = assignments.filter(a => a.status === 'completed').length
+      const pendingReviews = assignments.filter(a => 
+        a.status === 'submitted' && !a.reviewed_at
+      ).length
+
+      return {
+        ...task,
+        participants,
+        completedParticipants,
+        pendingReviews
+      }
+    })
+
+    return {
+      success: true,
+      message: '获取任务列表成功',
+      data: {
+        tasks: processedTasks
+      }
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '获取任务列表失败'
+    return {
+      success: false,
+      message,
+      data: {
+        tasks: []
+      }
+    }
+  }
+}
+
+/**
+ * 使用RPC函数获取考官任务列表（绕过认证限制）
+ */
+const getExaminerTasksWithRPC = async (examinerId: string): Promise<{
+  success: boolean
+  message: string
+  data: {
+    tasks: any[]
+  }
+}> => {
+  try {
+    // 使用RPC函数获取任务列表
+    const { data: tasks, error } = await supabase
+      .rpc('get_examiner_tasks', { p_examiner_id: examinerId })
+
+    if (error) {
+      console.warn('RPC函数调用失败，返回空列表:', error)
+      return {
+        success: true,
+        message: '获取任务列表成功（返回空列表）',
+        data: {
+          tasks: []
+        }
+      }
+    }
+
+    // 处理返回的任务数据，移除ability_type字段（如果存在）
+    const processedTasks = (tasks || []).map((task: any) => {
+      const { ability_type, ...rest } = task
+      
+      // 如果没有统计信息，添加默认值
+      return {
+        ...rest,
+        participants: rest.participants || 0,
+        completedParticipants: rest.completed_participants || 0,
+        pendingReviews: rest.pending_reviews || 0
+      }
+    })
+
+    return {
+      success: true,
+      message: '获取任务列表成功',
+      data: {
+        tasks: processedTasks
+      }
+    }
+  } catch (error) {
+    console.error('RPC方式获取任务列表失败:', error)
+    return {
+      success: true,
+      message: '获取任务列表成功（返回空列表）',
+      data: {
+        tasks: []
+      }
+    }
+  }
+}
+
+/**
+ * 更新任务状态
+ */
+export const updateTaskStatus = async (taskId: string, newStatus: string): Promise<{
+  success: boolean
+  message: string
+  data?: {
+    task_id: string
+    new_status: string
+    updated_at: string
+  }
+}> => {
+  try {
+    const currentUser = authService.getCurrentUser()
+    if (!currentUser) {
+      return {
+        success: false,
+        message: '用户未登录'
+      }
+    }
+
+    // 使用RPC函数更新任务状态
+    const { data: result, error } = await supabase
+      .rpc('update_task_status', {
+        p_task_id: taskId,
+        p_new_status: newStatus
+      })
+
+    if (error) {
+      throw new Error(`RPC函数调用失败: ${error.message}`)
+    }
+
+    // 解析RPC返回结果
+    if (result && !result.success) {
+      throw new Error(result.message)
+    }
+
+    return {
+      success: true,
+      message: result.message || '任务状态更新成功',
+      data: result.data
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '更新任务状态失败'
+    return {
+      success: false,
+      message
+    }
+  }
+}
+
+/**
+ * 删除任务（包含二次确认）
+ */
+export const deleteTask = async (taskId: string, confirmationCode?: string): Promise<{
+  success: boolean
+  message: string
+  confirmation_required?: boolean
+  confirmation_message?: string
+  expected_code?: string
+  affected_assignments?: number
+  data?: {
+    task_id: string
+    deleted_assignments: number
+    deleted_at: string
+  }
+}> => {
+  try {
+    const currentUser = authService.getCurrentUser()
+    if (!currentUser) {
+      return {
+        success: false,
+        message: '用户未登录'
+      }
+    }
+
+    // 使用RPC函数删除任务
+    const { data: result, error } = await supabase
+      .rpc('delete_examiner_task', {
+        p_task_id: taskId,
+        p_confirmation_code: confirmationCode
+      })
+
+    if (error) {
+      throw new Error(`RPC函数调用失败: ${error.message}`)
+    }
+
+    // 如果返回结果包含confirmation_required，表示需要二次确认
+    if (result && result.confirmation_required) {
+      return {
+        success: false,
+        message: result.message,
+        confirmation_required: true,
+        confirmation_message: result.confirmation_message,
+        expected_code: result.expected_code,
+        affected_assignments: result.affected_assignments
+      }
+    }
+
+    // 解析RPC返回结果
+    if (result && !result.success) {
+      throw new Error(result.message)
+    }
+
+    return {
+      success: true,
+      message: result.message || '任务删除成功',
+      data: result.data
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '删除任务失败'
+    return {
+      success: false,
+      message
+    }
+  }
+}
+
+/**
+ * 更新任务详细信息
+ */
+export const updateTaskDetails = async (taskId: string, taskData: {
+  title?: string
+  description?: string
+  reward_points?: number
+  deadline?: string
+  expires_in_months?: number
+  status?: string
+}): Promise<{
+  success: boolean
+  message: string
+  data?: {
+    task_id: string
+    updated_fields: string[]
+    updated_at: string
+  }
+}> => {
+  try {
+    const currentUser = authService.getCurrentUser()
+    if (!currentUser) {
+      return {
+        success: false,
+        message: '用户未登录'
+      }
+    }
+
+    // 使用RPC函数更新任务详细信息
+    const { data: result, error } = await supabase
+      .rpc('update_task_details', {
+        p_task_id: taskId,
+        p_title: taskData.title,
+        p_description: taskData.description,
+        p_reward_points: taskData.reward_points,
+        p_deadline: taskData.deadline,
+        p_expires_in_months: taskData.expires_in_months,
+        p_status: taskData.status
+      })
+
+    if (error) {
+      throw new Error(`RPC函数调用失败: ${error.message}`)
+    }
+
+    // 解析RPC返回结果
+    if (result && !result.success) {
+      throw new Error(result.message)
+    }
+
+    return {
+      success: true,
+      message: result.message || '任务信息更新成功',
+      data: result.data
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '更新任务信息失败'
+    return {
+      success: false,
+      message
+    }
+  }
+}
+
+/**
+ * 创建新任务
+ */
+export const createTask = async (taskData: {
+  title: string
+  description: string
+  reward_points: number
+  deadline: string
+  expires_in_months: number
+  status: string
+}): Promise<{
+  success: boolean
+  message: string
+  data?: {
+    task: any
+  }
+}> => {
+  try {
+    const currentUser = authService.getCurrentUser()
+    if (!currentUser) {
+      return {
+        success: false,
+        message: '用户未登录'
+      }
+    }
+
+    // 首先检查Supabase认证状态，如果没有认证则设置认证
+    const { data: sessionData } = await supabase.auth.getSession()
+    if (!sessionData.session) {
+      console.warn('Supabase会话未认证，尝试设置认证')
+      
+      // 获取当前用户的认证token
+      const token = authService.getToken()
+      if (token) {
+        // 设置Supabase认证会话
+        const { data: signInData, error: signInError } = await supabase.auth.setSession({
+          access_token: token,
+          refresh_token: ''
+        })
+        
+        if (signInError) {
+          console.warn('设置Supabase会话失败:', signInError)
+          // 尝试使用RPC函数绕过认证
+          return await createTaskWithRPC(currentUser.id, taskData)
+        }
+        
+        console.log('Supabase会话设置成功')
+      } else {
+        console.warn('没有认证token，使用RPC函数')
+        return await createTaskWithRPC(currentUser.id, taskData)
+      }
+    }
+
+    // 计算过期时间
+    const expiresAt = new Date()
+    expiresAt.setMonth(expiresAt.getMonth() + taskData.expires_in_months)
+
+    // 插入新任务
+    const { data: newTask, error } = await supabase
+      .from('tasks')
+      .insert({
+        title: taskData.title,
+        description: taskData.description,
+        reward_points: taskData.reward_points,
+        deadline: taskData.deadline,
+        expires_in_months: taskData.expires_in_months,
+        status: taskData.status,
+        examiner_id: currentUser.id
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.warn('直接插入失败，尝试使用RPC函数:', error)
+      return await createTaskWithRPC(currentUser.id, taskData)
+    }
+
+    return {
+      success: true,
+      message: '任务创建成功',
+      data: {
+        task: newTask
+      }
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '任务创建失败'
+    return {
+      success: false,
+      message
+    }
+  }
+}
+
+/**
+ * 使用RPC函数创建任务（绕过认证限制）
+ */
+const createTaskWithRPC = async (examinerId: string, taskData: {
+  title: string
+  description: string
+  reward_points: number
+  deadline: string
+  expires_in_months: number
+  status: string
+}): Promise<{
+  success: boolean
+  message: string
+  data?: {
+    task: any
+  }
+}> => {
+  try {
+    // 使用RPC函数创建任务
+    const { data: newTask, error } = await supabase
+      .rpc('create_examiner_task', {
+        p_examiner_id: examinerId,
+        p_title: taskData.title,
+        p_description: taskData.description,
+        p_reward_points: taskData.reward_points,
+        p_deadline: taskData.deadline,
+        p_expires_in_months: taskData.expires_in_months,
+        p_status: taskData.status
+      })
+
+    if (error) {
+      throw new Error(`RPC函数调用失败: ${error.message}`)
+    }
+
+    return {
+      success: true,
+      message: '任务创建成功',
+      data: {
+        task: newTask
+      }
+    }
+  } catch (error) {
+    console.error('RPC方式创建任务失败:', error)
+    const message = error instanceof Error ? error.message : '任务创建失败'
+    return {
+      success: false,
+      message
+    }
+  }
+}
+
+/**
+ * 获取任务参与者列表（学生提交的作品）
+ * 只返回状态为'submitted'和'completed'的学生记录
+ */
+export const getTaskParticipants = async (taskId: string): Promise<{
+  success: boolean
+  message: string
+  data: {
+    students: any[]
+  }
+}> => {
+  try {
+    const currentUser = authService.getCurrentUser()
+    if (!currentUser) {
+      return {
+        success: false,
+        message: '用户未登录',
+        data: {
+          students: []
+        }
+      }
+    }
+
+    // 使用RPC函数获取任务参与者（RPC函数已过滤只返回submitted和completed状态）
+    const { data: participants, error } = await supabase
+      .rpc('get_task_participants', { p_task_id: taskId })
+
+    if (error) {
+      console.error('RPC函数调用失败:', error)
+      return {
+        success: false,
+        message: `获取参与者列表失败: ${error.message}`,
+        data: {
+          students: []
+        }
+      }
+    }
+
+    // 处理返回的学生数据 - RPC函数已确保只返回submitted和completed状态
+    const students = (participants || []).map((student: any) => ({
+      id: student.id,
+      username: student.username,
+      email: student.email,
+      submission_date: student.submission_date,
+      submission_url: student.submission_url,
+      status: student.status // 直接使用RPC返回的状态字段
+    }))
+
+    return {
+      success: true,
+      message: '获取参与者列表成功',
+      data: {
+        students
+      }
+    }
+  } catch (error) {
+    console.error('获取任务参与者失败:', error)
+    const message = error instanceof Error ? error.message : '获取参与者列表失败'
+    return {
+      success: false,
+      message,
+      data: {
+        students: []
+      }
+    }
+  }
+}
+
+/**
+ * 批准学生提交的作品
+ */
+export const approveSubmission = async (studentId: string, taskId: string): Promise<{
+  success: boolean
+  message: string
+  data?: {
+    student_id: string
+    task_id: string
+    approved_at: string
+  }
+}> => {
+  try {
+    const currentUser = authService.getCurrentUser()
+    if (!currentUser) {
+      return {
+        success: false,
+        message: '用户未登录'
+      }
+    }
+
+    // 使用RPC函数批准提交
+    const { data: result, error } = await supabase
+      .rpc('approve_task_submission', {
+        p_student_id: studentId,
+        p_task_id: taskId,
+        p_examiner_id: currentUser.id
+      })
+
+    if (error) {
+      throw new Error(`RPC函数调用失败: ${error.message}`)
+    }
+
+    // 解析RPC返回结果
+    if (result && !result.success) {
+      throw new Error(result.message)
+    }
+
+    return {
+      success: true,
+      message: result.message || '作品已通过评审',
+      data: result.data
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '评审操作失败'
+    return {
+      success: false,
+      message
+    }
+  }
+}
+
+/**
+ * 拒绝学生提交的作品
+ */
+export const rejectSubmission = async (studentId: string, taskId: string): Promise<{
+  success: boolean
+  message: string
+  data?: {
+    student_id: string
+    task_id: string
+    rejected_at: string
+  }
+}> => {
+  try {
+    const currentUser = authService.getCurrentUser()
+    if (!currentUser) {
+      return {
+        success: false,
+        message: '用户未登录'
+      }
+    }
+
+    // 使用RPC函数拒绝提交
+    const { data: result, error } = await supabase
+      .rpc('reject_task_submission', {
+        p_student_id: studentId,
+        p_task_id: taskId,
+        p_examiner_id: currentUser.id
+      })
+
+    if (error) {
+      throw new Error(`RPC函数调用失败: ${error.message}`)
+    }
+
+    // 解析RPC返回结果
+    if (result && !result.success) {
+      throw new Error(result.message)
+    }
+
+    return {
+      success: true,
+      message: result.message || '作品已拒绝',
+      data: result.data
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '评审操作失败'
+    return {
+      success: false,
+      message
+    }
+  }
+}
+
 export default {
   generateTeacherKey,
   getTeacherStudents,
   getStudentTeacher,
   bindStudentTeacher,
   getStudentAbilities,
-  assignStudentAbilities
+  getStudentActualAbilities,
+  assignStudentAbilities,
+  getExaminerTasks,
+  createTask,
+  updateTaskStatus,
+  deleteTask,
+  updateTaskDetails,
+  getTaskParticipants,
+  approveSubmission,
+  rejectSubmission
 }

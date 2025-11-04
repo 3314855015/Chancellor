@@ -79,6 +79,20 @@
     </main>
 
     <Footer />
+
+    <!-- 学生能力模态框 -->
+    <StudentAbilityModal 
+      v-if="showAbilityModal" 
+      :student-id="selectedStudentId"
+      @close="showAbilityModal = false"
+    />
+
+    <!-- 学生任务历史模态框 -->
+    <StudentTaskHistoryModal 
+      v-if="showTaskHistoryModal" 
+      :student-id="selectedStudentId"
+      @close="showTaskHistoryModal = false"
+    />
   </div>
 </template>
 
@@ -90,15 +104,22 @@ import Button from '@/components/Button.vue'
 import Footer from '@/components/Footer.vue'
 import EnterpriseWelcome from '@/components/Welcome/EnterpriseWelcome.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import StudentAbilityModal from '@/components/Modals/StudentAbilityModal.vue'
+import StudentTaskHistoryModal from '@/components/Modals/StudentTaskHistoryModal.vue'
+import enterpriseService from '@/services/enterpriseService'
+
 
 
 
 const showBuyPoints = ref(false)
 const showStudentCards = ref(false)
 const showDescriptionInput = ref(false)
+const showAbilityModal = ref(false)
+const showTaskHistoryModal = ref(false)
 const userDescription = ref('')
 const selectedOption = ref(10)
 const isLoading = ref(false)
+const selectedStudentId = ref('')
 const pageContainer = ref<HTMLElement | null>(null)
 const filter = ref({
   skill: '',
@@ -177,10 +198,27 @@ const refreshList = () => {
   alert('刷新学生列表')
 }
 
-const contactStudent = (student: any) => {
-  if (enterpriseInfo.value.points >= 1) {
+const contactStudent = async (student: any) => {
+  if (!student.id) {
+    alert('学生ID不存在，无法联系')
+    return
+  }
+  
+  if (enterpriseInfo.value.points < 1) {
+    alert('点数不足，请先购买点数')
+    return
+  }
+  
+  try {
+    // 调用企业服务联系学生
+    await enterpriseService.contactStudent(student.id)
+    
+    // 扣除点数
     enterpriseInfo.value.points -= 1
     alert(`已联系 ${student.name}，消耗1点，剩余${enterpriseInfo.value.points}点`)
+  } catch (error) {
+    console.error('联系学生失败:', error)
+    alert('联系学生失败，请稍后重试')
   }
 }
 
@@ -201,12 +239,34 @@ const viewPointsHistory = () => {
   alert('查看点数消费记录')
 }
 
-const viewAbility = (student: any) => {
-  alert(`查看 ${student.name} 的能力详情：${student.ability}/10`)
+const viewAbility = async (student: any) => {
+  if (!student.id) {
+    alert('学生ID不存在，无法查看能力详情')
+    return
+  }
+  
+  try {
+    selectedStudentId.value = student.id
+    showAbilityModal.value = true
+  } catch (error) {
+    console.error('查看学生能力失败:', error)
+    alert('查看学生能力失败，请稍后重试')
+  }
 }
 
-const viewTaskHistory = (student: any) => {
-  alert(`查看 ${student.name} 的任务历史`)
+const viewTaskHistory = async (student: any) => {
+  if (!student.id) {
+    alert('学生ID不存在，无法查看任务历史')
+    return
+  }
+  
+  try {
+    selectedStudentId.value = student.id
+    showTaskHistoryModal.value = true
+  } catch (error) {
+    console.error('查看学生任务历史失败:', error)
+    alert('查看学生任务历史失败，请稍后重试')
+  }
 }
 
 const fetchAIRecommendations = async () => {
@@ -222,8 +282,10 @@ const fetchAIRecommendations = async () => {
   //http://localhost:5678/webhook/ai-recommendation
   //http://localhost:5678/webhook-test/ai-recommendation
   //https://yjw123456.app.n8n.cloud/webhook/ai-recommendation
+  //
+  
   try {
-    const response = await fetch('https://yjw123456.app.n8n.cloud/webhook/ai-recommendation', {
+    const response = await fetch('http://localhost:5678/webhook-test/ai-recommendation', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

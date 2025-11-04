@@ -16,6 +16,55 @@
         {{ successMessage }}
       </div>
       
+      <!-- 提交成果模态框 -->
+      <Modal 
+        :visible="showSubmitModal" 
+        title="提交任务成果" 
+        @close="closeSubmitModal"
+      >
+        <div class="submit-modal-content">
+          <div class="task-info">
+            <h4>{{ currentTask?.title }}</h4>
+            <p class="task-description">{{ currentTask?.description }}</p>
+            <div class="task-meta">
+              <span class="meta-item">🎯 奖励：{{ currentTask?.reward }}点</span>
+              <span class="meta-item">⏰ 截止：{{ formatTaskDate(currentTask?.deadline) }}</span>
+            </div>
+          </div>
+          
+          <div class="submission-form">
+            <label for="submission-text">成果描述：</label>
+            <textarea 
+              id="submission-text"
+              v-model="submissionText" 
+              placeholder="请详细描述您的任务完成情况、遇到的问题、解决方案等..."
+              rows="6"
+              class="submission-textarea"
+            ></textarea>
+          </div>
+          
+          <!-- 模态框内的错误消息 -->
+          <div v-if="modalErrorMessage" class="modal-error-message">
+            {{ modalErrorMessage }}
+          </div>
+          
+          <div class="modal-actions">
+            <Button 
+              label="取消" 
+              variant="secondary" 
+              @click="closeSubmitModal"
+            />
+            <Button 
+              label="提交成果" 
+              variant="primary" 
+              @click="confirmSubmitTask"
+              :loading="isSubmitting"
+              :disabled="!submissionText.trim()"
+            />
+          </div>
+        </div>
+      </Modal>
+      
       <!-- 个人信息与能力展示 -->
       <section class="section">
         <h2 class="section-title">👤 个人信息 & 💪 能力展示</h2>
@@ -113,56 +162,153 @@
       <!-- 任务中心 -->
       <section class="section">
         <h2 class="section-title">📋 任务中心</h2>
-        <div class="tasks-tabs">
-          <Button 
-            label="可接任务" 
-            :variant="activeTab === 'available' ? 'primary' : 'secondary'"
-            @click="activeTab = 'available'" 
-          />
-          <Button 
-            label="已接任务" 
-            :variant="activeTab === 'accepted' ? 'primary' : 'secondary'"
-            @click="activeTab = 'accepted'" 
-          />
-          <Button 
-            label="完成任务" 
-            :variant="activeTab === 'completed' ? 'primary' : 'secondary'"
-            @click="activeTab = 'completed'" 
-          />
+        
+        <!-- 教师绑定提示 -->
+        <div v-if="!studentTeacher" class="teacher-bind-prompt">
+          <div class="bind-prompt-content">
+            <span class="prompt-icon">🔑</span>
+            <div class="prompt-text">
+              <h4>绑定教师后查看任务</h4>
+              <p>请先绑定指导教师，才能查看和接取任务</p>
+            </div>
+          </div>
         </div>
 
-        <!-- 任务列表 -->
-        <div class="tasks-list">
-          <Card v-for="task in filteredTasks" :key="task.id" class="task-item" hoverable>
-            <div class="task-content">
-              <h4>{{ task.title }}</h4>
-              <p>{{ task.description }}</p>
-              <div class="task-meta">
-                <span>奖励：{{ task.reward }}点</span>
-                <span>截止：{{ task.deadline }}</span>
-                <span>发布者：{{ task.publisher }}</span>
+        <div v-else>
+          <div class="tasks-tabs">
+            <Button 
+              label="可接任务" 
+              :variant="activeTab === 'available' ? 'primary' : 'secondary'"
+              @click="activeTab = 'available'; currentPage = 1" 
+            />
+            <Button 
+              label="已接任务" 
+              :variant="activeTab === 'accepted' ? 'primary' : 'secondary'"
+              @click="activeTab = 'accepted'; currentPage = 1" 
+            />
+            <Button 
+              label="已完成任务" 
+              :variant="activeTab === 'completed' ? 'primary' : 'secondary'"
+              @click="activeTab = 'completed'; currentPage = 1" 
+            />
+          </div>
+
+          <!-- 任务列表 - 一行4个容器 -->
+          <div class="tasks-grid-container">
+            <div v-if="paginatedTasks.length === 0" class="no-tasks">
+              <div class="no-tasks-content">
+                <span class="no-tasks-icon">📭</span>
+                <h4>暂无{{ getTabName(activeTab) }}</h4>
+                <p>当前没有{{ getTabName(activeTab) }}，请等待教师发布新任务</p>
               </div>
             </div>
-            <div class="task-actions">
+            
+            <div v-else class="tasks-grid">
+              <Card 
+                v-for="task in paginatedTasks" 
+                :key="task.id" 
+                class="task-card" 
+                hoverable
+              >
+                <div class="task-card-content">
+                  <div class="task-header">
+                    <h4 class="task-title">{{ task.title }}</h4>
+                    <span class="task-status" :class="task.status">
+                      {{ getTaskStatusText(task.status) }}
+                    </span>
+                  </div>
+                  
+                  <p class="task-description">{{ task.description }}</p>
+                  
+                  <div class="task-meta-grid">
+                    <div class="meta-item">
+                      <span class="meta-icon">🎯</span>
+                      <span class="meta-text">奖励：{{ task.reward }}点</span>
+                    </div>
+                    <div class="meta-item">
+                      <span class="meta-icon">⏰</span>
+                      <span class="meta-text">{{ formatTaskDate(task.deadline) }}</span>
+                    </div>
+                    <div class="meta-item">
+                      <span class="meta-icon">👨‍🏫</span>
+                      <span class="meta-text">{{ task.publisher }}</span>
+                    </div>
+                    <div class="meta-item">
+                      <span class="meta-icon">📅</span>
+                      <span class="meta-text">{{ formatTaskDate(task.createdAt) }}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="task-actions">
+                  <Button 
+                    v-if="task.status === 'available'" 
+                    label="接取任务" 
+                    @click="acceptTask(task)"
+                    size="small"
+                  />
+                  <Button 
+                    v-if="task.status === 'accepted'" 
+                    label="提交成果" 
+                    variant="warning"
+                    @click="submitTask(task)"
+                    size="small"
+                  />
+                  <Button 
+                    v-if="task.status === 'submitted'" 
+                    label="待评审" 
+                    variant="secondary"
+                    disabled 
+                    size="small"
+                  />
+                  <Button 
+                    v-if="task.status === 'completed'" 
+                    label="已完成" 
+                    variant="secondary"
+                    disabled 
+                    size="small"
+                  />
+                </div>
+              </Card>
+            </div>
+          </div>
+
+          <!-- 分页栏 - 常态显示 -->
+          <div v-if="filteredTasks.length > 0" class="pagination-container">
+            <div class="pagination-info">
+              共 {{ filteredTasks.length }} 个任务，第 {{ currentPage }} 页 / 共 {{ totalPages }} 页
+            </div>
+            <div class="pagination-controls">
               <Button 
-                v-if="task.status === 'available'" 
-                label="接取任务" 
-                @click="acceptTask(task)" 
-              />
-              <Button 
-                v-if="task.status === 'accepted'" 
-                label="提交成果" 
-                variant="warning"
-                @click="submitTask(task)" 
-              />
-              <Button 
-                v-if="task.status === 'completed'" 
-                label="已完成" 
+                label="上一页" 
                 variant="secondary"
-                disabled 
+                @click="goToPage(currentPage - 1)"
+                :disabled="currentPage <= 1"
+                size="small"
+              />
+              
+              <div class="page-numbers">
+                <button 
+                  v-for="page in visiblePages" 
+                  :key="page"
+                  class="page-btn"
+                  :class="{ active: page === currentPage }"
+                  @click="goToPage(page)"
+                >
+                  {{ page }}
+                </button>
+                <span v-if="showEllipsis" class="page-ellipsis">...</span>
+              </div>
+              
+              <Button 
+                label="下一页" 
+                variant="secondary"
+                @click="goToPage(currentPage + 1)"
+                :disabled="currentPage >= totalPages"
+                size="small"
               />
             </div>
-          </Card>
+          </div>
         </div>
       </section>
 
@@ -202,6 +348,7 @@ import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import Footer from '@/components/Footer.vue'
 import StudentWelcome from '@/components/Welcome/StudentWelcome.vue'
+import Modal from '@/components/Modals/BaseModal.vue'
 import studentService from '@/services/studentService'
 
 // 响应式数据
@@ -211,6 +358,15 @@ const errorMessage = ref('')
 const successMessage = ref('')
 const teacherKeyInput = ref('')
 const isUpdatingAbility = ref(false)
+const currentPage = ref(1)
+const pageSize = ref(8) // 每页显示8个任务（2行，每行4个）
+
+// 提交成果模态框相关
+const showSubmitModal = ref(false)
+const isSubmitting = ref(false)
+const currentTask = ref<any>(null)
+const submissionText = ref('')
+const modalErrorMessage = ref('')
 
 // 学生信息
 const studentInfo = ref({
@@ -245,15 +401,102 @@ const employmentOpportunities = ref<any[]>([])
 
 // 计算属性：根据标签过滤任务
 const filteredTasks = computed(() => {
+  if (activeTab.value === 'completed') {
+    // 完成任务标签页显示已提交和已完成的任务
+    return tasks.value.filter(task => task.status === 'submitted' || task.status === 'completed')
+  }
   return tasks.value.filter(task => task.status === activeTab.value)
 })
 
-// 获取状态文本
+// 分页相关计算属性
+const totalPages = computed(() => {
+  return Math.ceil(filteredTasks.value.length / pageSize.value)
+})
+
+const paginatedTasks = computed(() => {
+  const startIndex = (currentPage.value - 1) * pageSize.value
+  const endIndex = startIndex + pageSize.value
+  return filteredTasks.value.slice(startIndex, endIndex)
+})
+
+const visiblePages = computed(() => {
+  const pages = []
+  const maxVisiblePages = 5
+  
+  let startPage = Math.max(1, currentPage.value - Math.floor(maxVisiblePages / 2))
+  let endPage = Math.min(totalPages.value, startPage + maxVisiblePages - 1)
+  
+  if (endPage - startPage + 1 < maxVisiblePages) {
+    startPage = Math.max(1, endPage - maxVisiblePages + 1)
+  }
+  
+  for (let i = startPage; i <= endPage; i++) {
+    pages.push(i)
+  }
+  
+  return pages
+})
+
+const showEllipsis = computed(() => {
+  return totalPages.value > visiblePages.value.length && 
+         visiblePages.value[visiblePages.value.length - 1] < totalPages.value
+})
+
+// 获取学生状态文本
 const getStatusText = (status: string | null) => {
   switch (status) {
     case 'wild': return '在野'
     case 'selected': return '中举'
     default: return '未知'
+  }
+}
+
+// 获取任务状态文本
+const getTaskStatusText = (status: string | null) => {
+  switch (status) {
+    case 'available': return '可接取'
+    case 'accepted': return '已接取'
+    case 'submitted': return '待评审'
+    case 'completed': return '已完成'
+    default: return '未知'
+  }
+}
+
+// 获取标签名称
+const getTabName = (tab: string) => {
+  switch (tab) {
+    case 'available': return '可接任务'
+    case 'accepted': return '已接任务'
+    case 'completed': return '已完成任务'
+    default: return '任务'
+  }
+}
+
+// 格式化任务日期
+const formatTaskDate = (dateString: string) => {
+  if (!dateString) return '未设置'
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffTime = date.getTime() - now.getTime()
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  
+  if (diffDays < 0) {
+    return '已过期'
+  } else if (diffDays === 0) {
+    return '今天截止'
+  } else if (diffDays === 1) {
+    return '明天截止'
+  } else if (diffDays <= 7) {
+    return `${diffDays}天后截止`
+  } else {
+    return date.toLocaleDateString('zh-CN')
+  }
+}
+
+// 分页方法
+const goToPage = (page: number) => {
+  if (page >= 1 && page <= totalPages.value) {
+    currentPage.value = page
   }
 }
 
@@ -380,27 +623,51 @@ const acceptTask = async (task: any) => {
   }
 }
 
-// 提交任务
-const submitTask = async (task: any) => {
+// 打开提交成果模态框
+const openSubmitModal = (task: any) => {
+  currentTask.value = task
+  submissionText.value = ''
+  modalErrorMessage.value = ''
+  showSubmitModal.value = true
+}
+
+// 关闭提交成果模态框
+const closeSubmitModal = () => {
+  showSubmitModal.value = false
+  currentTask.value = null
+  submissionText.value = ''
+  isSubmitting.value = false
+  modalErrorMessage.value = ''
+}
+
+// 确认提交任务
+const confirmSubmitTask = async () => {
+  if (!currentTask.value || !submissionText.value.trim()) return
+  
   try {
-    const submission = prompt(`请输入任务 ${task.title} 的成果描述：`)
-    if (!submission) return
+    isSubmitting.value = true
+    modalErrorMessage.value = ''
     
-    const response = await studentService.submitTask(task.id, submission)
+    const response = await studentService.submitTask(currentTask.value.id, submissionText.value.trim())
     if (response.success) {
       // 重新加载任务列表
       await loadStudentTasks()
-      // 重新加载学生信息
-      await loadStudentInfo()
-      // 重新加载能力数据
-      await loadStudentAbilities()
-      successMessage.value = `任务 ${task.title} 已完成，获得 ${task.reward} 点能力值`
+      successMessage.value = `任务 ${currentTask.value.title} 已提交，等待教师评审`
+      closeSubmitModal()
     } else {
       throw new Error(response.message)
     }
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : '提交任务失败'
+    // 在模态框内显示错误消息，而不是页面顶部
+    modalErrorMessage.value = error instanceof Error ? error.message : '提交任务失败'
+  } finally {
+    isSubmitting.value = false
   }
+}
+
+// 提交任务（兼容旧代码，现在使用模态框）
+const submitTask = async (task: any) => {
+  openSubmitModal(task)
 }
 
 // 申请就业机会
@@ -737,50 +1004,257 @@ onMounted(async () => {
   text-align: right;
 }
 
+/* 教师绑定提示样式 */
+.teacher-bind-prompt {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border: 1px solid #dee2e6;
+  border-radius: 12px;
+  padding: 30px;
+  text-align: center;
+  margin: 20px 0;
+}
+
+.bind-prompt-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.prompt-icon {
+  font-size: 3rem;
+  opacity: 0.7;
+}
+
+.prompt-text h4 {
+  margin: 0 0 8px;
+  color: #495057;
+  font-size: 1.2rem;
+}
+
+.prompt-text p {
+  margin: 0;
+  color: #6c757d;
+  font-size: 0.95rem;
+}
+
 .tasks-tabs {
   display: flex;
   justify-content: center;
   gap: 10px;
-  margin-bottom: 20px;
+  margin-bottom: 30px;
   flex-wrap: wrap;
 }
 
-.tasks-list {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
+/* 任务网格容器 */
+.tasks-grid-container {
+  min-height: 300px;
 }
 
-.task-item {
+.tasks-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+/* 任务卡片样式 */
+.task-card {
+  height: 100%;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  transition: all 0.3s ease;
+  border: 1px solid #e9ecef;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.task-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  border-color: #87CEEB;
+}
+
+.task-card-content {
+  flex: 1;
   padding: 20px;
 }
 
-.task-content h4 {
-  margin: 0 0 10px;
+.task-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 15px;
+}
+
+.task-title {
+  margin: 0;
   color: #2c3e50;
   font-size: 1.1rem;
+  font-weight: 600;
+  line-height: 1.3;
+  flex: 1;
 }
 
-.task-content p {
-  margin: 0 0 10px;
-  color: #7f8c8d;
+.task-status {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-left: 10px;
+}
+
+.task-status.available {
+  background: rgba(76, 175, 80, 0.1);
+  color: #4caf50;
+  border: 1px solid rgba(76, 175, 80, 0.3);
+}
+
+.task-status.accepted {
+  background: rgba(255, 152, 0, 0.1);
+  color: #f57c00;
+  border: 1px solid rgba(255, 152, 0, 0.3);
+}
+
+.task-status.completed {
+  background: rgba(33, 150, 243, 0.1);
+  color: #2196f3;
+  border: 1px solid rgba(33, 150, 243, 0.3);
+}
+
+.task-description {
+  margin: 0 0 20px;
+  color: #6c757d;
   font-size: 0.9rem;
-  line-height: 1.4;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-.task-meta {
+.task-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.meta-item {
   display: flex;
-  gap: 15px;
+  align-items: center;
+  gap: 8px;
   font-size: 0.8rem;
-  color: #95a5a6;
+}
+
+.meta-icon {
+  font-size: 0.9rem;
+  opacity: 0.7;
+}
+
+.meta-text {
+  color: #6c757d;
+  font-weight: 500;
 }
 
 .task-actions {
+  padding: 15px 20px;
+  border-top: 1px solid #f1f3f4;
+  background: #f8f9fa;
   display: flex;
-  gap: 10px;
+  justify-content: center;
+}
+
+/* 无任务状态 */
+.no-tasks {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+  padding: 40px 20px;
+}
+
+.no-tasks-content {
+  text-align: center;
+  max-width: 300px;
+}
+
+.no-tasks-icon {
+  font-size: 4rem;
+  opacity: 0.3;
+  margin-bottom: 15px;
+  display: block;
+}
+
+.no-tasks h4 {
+  margin: 0 0 8px;
+  color: #6c757d;
+  font-size: 1.1rem;
+}
+
+.no-tasks p {
+  margin: 0;
+  color: #adb5bd;
+  font-size: 0.9rem;
+}
+
+/* 分页样式 */
+.pagination-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin-top: 20px;
+}
+
+.pagination-info {
+  color: #6c757d;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.page-numbers {
+  display: flex;
+  gap: 5px;
+}
+
+.page-btn {
+  padding: 6px 12px;
+  border: 1px solid #dee2e6;
+  background: white;
+  color: #495057;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.page-btn:hover {
+  background: #e9ecef;
+  border-color: #adb5bd;
+}
+
+.page-btn.active {
+  background: #87CEEB;
+  color: white;
+  border-color: #87CEEB;
+}
+
+.page-ellipsis {
+  padding: 6px 8px;
+  color: #6c757d;
+  font-size: 0.85rem;
 }
 
 .employment-list {
@@ -872,6 +1346,166 @@ onMounted(async () => {
   .tasks-tabs {
     flex-direction: column;
     align-items: center;
+  }
+  
+  /* 任务网格响应式 */
+  .tasks-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+  }
+  
+  .task-card-content {
+    padding: 15px;
+  }
+  
+  .task-meta-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  
+  .pagination-container {
+    padding: 15px;
+  }
+  
+  .pagination-controls {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .page-numbers {
+    order: -1;
+  }
+}
+
+@media (max-width: 480px) {
+  .tasks-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .task-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .task-status {
+    margin-left: 0;
+    align-self: flex-start;
+  }
+}
+
+/* 提交成果模态框样式 */
+.submit-modal-content {
+  padding: 20px;
+}
+
+.task-info {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  border-left: 4px solid #007bff;
+}
+
+.task-info h4 {
+  margin: 0 0 10px 0;
+  color: #2c3e50;
+  font-size: 1.2rem;
+}
+
+.task-info .task-description {
+  margin: 0 0 15px 0;
+  color: #6c757d;
+  line-height: 1.5;
+}
+
+.task-meta {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.9rem;
+  color: #495057;
+}
+
+.submission-form {
+  margin-bottom: 20px;
+}
+
+.submission-form label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.submission-textarea {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 14px;
+  resize: vertical;
+  transition: border-color 0.3s ease;
+}
+
+.submission-textarea:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.submission-textarea::placeholder {
+  color: #adb5bd;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 20px;
+  border-top: 1px solid #e9ecef;
+}
+
+.modal-error-message {
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 4px;
+  color: #721c24;
+  padding: 12px;
+  margin: 15px 0;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .submit-modal-content {
+    padding: 15px;
+  }
+  
+  .task-info {
+    padding: 15px;
+  }
+  
+  .task-meta {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .modal-actions {
+    flex-direction: column;
+  }
+  
+  .modal-actions .btn {
+    width: 100%;
   }
 }
 </style>

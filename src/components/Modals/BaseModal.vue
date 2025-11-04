@@ -1,6 +1,6 @@
 <template>
   <div v-if="visible" class="modal-overlay" @click="handleOverlayClick">
-    <div class="modal-content" @click.stop>
+    <div class="modal-content" :class="size" :style="{ maxWidth: width }" @click.stop>
       <div class="modal-header">
         <h3>{{ title }}</h3>
         <button class="close-btn" @click="$emit('close')">
@@ -23,6 +23,8 @@
 interface Props {
   visible: boolean
   title: string
+  size?: 'small' | 'medium' | 'large'
+  width?: string
 }
 
 defineProps<Props>()

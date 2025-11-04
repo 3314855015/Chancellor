@@ -44,6 +44,22 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/examiner/task/create',
+    name: 'ExaminerTaskCreate',
+    component: () => import('@/views/ExaminerTaskCreate.vue'),
+    meta: {
+      title: '发布新任务'
+    }
+  },
+  {
+    path: '/examiner/task/manage',
+    name: 'ExaminerTaskManage',
+    component: () => import('@/views/ExaminerTaskManage.vue'),
+    meta: {
+      title: '任务管理'
+    }
+  },
+  {
     path: '/enterprise',
     name: 'Enterprise',
     component: () => import('@/views/EnterprisePage.vue'),
