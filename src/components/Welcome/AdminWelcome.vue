@@ -16,14 +16,16 @@
 </template>
 
 <script setup lang="ts">
+import { defineEmits } from 'vue'
+
+const emit = defineEmits(['inviteEnterprise', 'appointExaminer'])
+
 const inviteEnterprise = () => {
-  // 跳转到生成企业密钥功能
-  alert('生成企业密钥【请帖】')
+  emit('inviteEnterprise')
 }
 
 const appointExaminer = () => {
-  // 跳转到生成考官密钥功能
-  alert('生成考官密钥【升官】')
+  emit('appointExaminer')
 }
 </script>
 

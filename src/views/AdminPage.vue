@@ -5,7 +5,10 @@
       subtitle="生成密钥 · 管理系统安全"
     />
     
-    <AdminWelcome />
+    <AdminWelcome 
+      @invite-enterprise="handleInviteEnterprise"
+      @appoint-examiner="handleAppointExaminer"
+    />
     
     <main class="main-content">
       <!-- 消息显示区域 -->
@@ -23,7 +26,7 @@
           <Card class="key-card" hoverable>
             <template #header>
               <div class="card-icon">📨</div>
-              <h3>企业密钥【请帖】</h3>
+              <h3>《请帖》</h3>
             </template>
             <p>用于企业身份认证和注册</p>
             <template #footer>
@@ -44,7 +47,7 @@
           <Card class="key-card" hoverable>
             <template #header>
               <div class="card-icon">📈</div>
-              <h3>考官密钥【升官】</h3>
+              <h3>《升官》</h3>
             </template>
             <p>用于考官身份认证和注册</p>
             <template #footer>
@@ -137,6 +140,60 @@ const examinerKey = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
+const enterpriseButtonDisabled = ref(false)
+const examinerButtonDisabled = ref(false)
+const enterpriseButtonCooldown = ref(0)
+const examinerButtonCooldown = ref(0)
+
+// 滚动到密钥生成区域
+const scrollToKeySection = () => {
+  const keySection = document.querySelector('.section')
+  if (keySection) {
+    keySection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+}
+
+// 设置按钮冷却时间
+const setButtonCooldown = (type: 'enterprise' | 'examiner', seconds: number) => {
+  if (type === 'enterprise') {
+    enterpriseButtonDisabled.value = true
+    enterpriseButtonCooldown.value = seconds
+    
+    const interval = setInterval(() => {
+      enterpriseButtonCooldown.value--
+      if (enterpriseButtonCooldown.value <= 0) {
+        enterpriseButtonDisabled.value = false
+        clearInterval(interval)
+      }
+    }, 1000)
+  } else {
+    examinerButtonDisabled.value = true
+    examinerButtonCooldown.value = seconds
+    
+    const interval = setInterval(() => {
+      examinerButtonCooldown.value--
+      if (examinerButtonCooldown.value <= 0) {
+        examinerButtonDisabled.value = false
+        clearInterval(interval)
+      }
+    }, 1000)
+  }
+}
+
+// 处理欢迎组件的按钮点击
+const handleInviteEnterprise = () => {
+  if (enterpriseButtonDisabled.value) return
+  setButtonCooldown('enterprise', 3) // 3秒冷却时间
+  scrollToKeySection()
+  generateEnterpriseKey()
+}
+
+const handleAppointExaminer = () => {
+  if (examinerButtonDisabled.value) return
+  setButtonCooldown('examiner', 3) // 3秒冷却时间
+  scrollToKeySection()
+  generateExaminerKey()
+}
 
 // 获取当前用户ID
 const getCurrentUserId = () => {
@@ -146,6 +203,8 @@ const getCurrentUserId = () => {
 
 const generateEnterpriseKey = async () => {
   try {
+    if (enterpriseButtonDisabled.value) return
+    
     loading.value = true
     errorMessage.value = ''
     successMessage.value = ''
@@ -177,6 +236,8 @@ const generateEnterpriseKey = async () => {
 
 const generateExaminerKey = async () => {
   try {
+    if (examinerButtonDisabled.value) return
+    
     loading.value = true
     errorMessage.value = ''
     successMessage.value = ''
