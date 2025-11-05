@@ -283,7 +283,7 @@ const fetchAIRecommendations = async () => {
   //http://localhost:5678/webhook-test/ai-recommendation
   //https://yjw123456.app.n8n.cloud/webhook/ai-recommendation
   try {
-    const response = await fetch('http://localhost:5678/webhook-test/ai-recommendation', {
+    const response = await fetch('http://localhost:5678/webhook/ai-recommendation', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -447,6 +447,9 @@ const fetchAIRecommendations = async () => {
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 320px;
 }
 
 
@@ -506,19 +509,28 @@ const fetchAIRecommendations = async () => {
   padding: 15px;
   border-radius: 8px;
   border-left: 4px solid #87CEEB;
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  overflow-y: auto;
+  max-height: 200px;
 }
 
 .student-actions {
   display: flex;
   gap: 10px;
   justify-content: space-between;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  margin-top: auto;
+  padding-top: 20px;
+  border-top: 1px solid rgba(135, 206, 235, 0.2);
 }
 
 .student-actions .button {
   flex: 1;
   min-width: 100px;
   text-align: center;
+  white-space: nowrap;
 }
 
 /* 描述输入模态框样式 */
