@@ -282,8 +282,6 @@ const fetchAIRecommendations = async () => {
   //http://localhost:5678/webhook/ai-recommendation
   //http://localhost:5678/webhook-test/ai-recommendation
   //https://yjw123456.app.n8n.cloud/webhook/ai-recommendation
-  //
-  
   try {
     const response = await fetch('http://localhost:5678/webhook-test/ai-recommendation', {
       method: 'POST',
