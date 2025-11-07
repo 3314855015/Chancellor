@@ -3,6 +3,7 @@
     <StudentNav 
       title="🎓 监生面板" 
       subtitle="接取任务 · 提升能力 · 寻求就业"
+      @avatar-click="showUserInfoModal = true"
     />
     
     <StudentWelcome :student-status="studentInfo.status" />
@@ -441,6 +442,12 @@
     </main>
 
     <Footer />
+
+    <!-- 用户信息模态框 -->
+    <UserInfoModal 
+      v-model:visible="showUserInfoModal"
+      @close="showUserInfoModal = false"
+    />
   </div>
 </template>
 
@@ -452,6 +459,7 @@ import Button from '@/components/Button.vue'
 import Footer from '@/components/Footer.vue'
 import StudentWelcome from '@/components/Welcome/StudentWelcome.vue'
 import Modal from '@/components/Modals/BaseModal.vue'
+import UserInfoModal from '@/components/Modals/UserInfoModal.vue'
 import studentService from '@/services/studentService'
 
 // 响应式数据
@@ -484,6 +492,9 @@ const studentInfo = ref({
 
 // 教师信息
 const studentTeacher = ref<any>(null)
+
+// 用户信息模态框
+const showUserInfoModal = ref(false)
 
 // 能力数据
 const abilities = ref([
@@ -968,29 +979,43 @@ onMounted(async () => {
 }
 
 .main-content {
-  max-width: 1200px;
+  max-width: 1600px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 30px;
 }
 
 .section {
-  margin-bottom: 40px;
+  margin-bottom: 60px;
 }
 
 .section-title {
   text-align: center;
-  font-size: 1.8rem;
+  font-size: 2rem;
   color: #2c3e50;
-  margin-bottom: 30px;
-  font-weight: 600;
+  margin-bottom: 40px;
+  font-weight: 700;
+  position: relative;
+  padding-bottom: 15px;
+}
+
+.section-title::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px;
+  height: 3px;
+  background: linear-gradient(135deg, #87CEEB 0%, #98D8F0 100%);
+  border-radius: 2px;
 }
 
 /* 个人信息与能力展示容器 */
 .profile-abilities-container {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 30px;
-  margin-top: 20px;
+  gap: 35px;
+  margin-top: 30px;
   align-items: stretch;
 }
 
@@ -998,18 +1023,41 @@ onMounted(async () => {
   height: 100%;
   display: flex;
   flex-direction: column;
+  border-radius: 20px;
+  border: 2px solid #f0f4f8;
+  box-shadow: 0 8px 30px rgba(135, 206, 235, 0.15);
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.profile-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 20px 50px rgba(135, 206, 235, 0.25);
+  border-color: #87CEEB;
 }
 
 .abilities-card {
   height: 100%;
   display: flex;
   flex-direction: column;
+  border-radius: 20px;
+  border: 2px solid #f0f4f8;
+  box-shadow: 0 8px 30px rgba(135, 206, 235, 0.15);
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.abilities-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 20px 50px rgba(135, 206, 235, 0.25);
+  border-color: #87CEEB;
 }
 
 .profile-content {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 25px;
+  padding: 30px;
 }
 
 .profile-avatar {
@@ -1156,18 +1204,25 @@ onMounted(async () => {
 .abilities-grid {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   flex: 1;
+  padding: 30px;
 }
 
 .ability-cell {
-  padding: 8px 12px;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  background: #fafafa;
-  min-height: 50px;
+  padding: 12px 16px;
+  border: 2px solid #f0f4f8;
+  border-radius: 12px;
+  background: #f8f9fa;
+  min-height: 60px;
   display: flex;
   align-items: center;
+  transition: all 0.3s ease;
+}
+
+.ability-cell:hover {
+  border-color: #87CEEB;
+  box-shadow: 0 4px 15px rgba(135, 206, 235, 0.2);
 }
 
 .ability-row {
@@ -1279,24 +1334,25 @@ onMounted(async () => {
 .tasks-grid-container {
   min-height: 300px;
   background: white;
-  border-radius: 12px;
-  border: 1px solid #e9ecef;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  border-radius: 16px;
+  border: 2px solid #f0f4f8;
+  box-shadow: 0 8px 30px rgba(135, 206, 235, 0.15);
   transition: all 0.3s ease;
-  padding: 25px;
+  padding: 30px;
+  backdrop-filter: blur(10px);
 }
 
 .tasks-grid-container:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  transform: translateY(-5px);
+  box-shadow: 0 20px 50px rgba(135, 206, 235, 0.25);
   border-color: #87CEEB;
 }
 
 .tasks-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
-  margin-bottom: 30px;
+  gap: 25px;
+  margin-bottom: 40px;
 }
 
 /* 任务卡片样式 */
@@ -1305,20 +1361,22 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   transition: all 0.3s ease;
-  border: 1px solid #e9ecef;
-  border-radius: 12px;
+  border: 2px solid #f0f4f8;
+  border-radius: 16px;
   overflow: hidden;
+  background: white;
+  box-shadow: 0 4px 20px rgba(135, 206, 235, 0.1);
 }
 
 .task-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  transform: translateY(-5px);
+  box-shadow: 0 15px 40px rgba(135, 206, 235, 0.25);
   border-color: #87CEEB;
 }
 
 .task-card-content {
   flex: 1;
-  padding: 20px;
+  padding: 25px;
 }
 
 .task-header {
@@ -1401,8 +1459,8 @@ onMounted(async () => {
 }
 
 .task-actions {
-  padding: 15px 20px;
-  border-top: 1px solid #f1f3f4;
+  padding: 20px;
+  border-top: 2px solid #f0f4f8;
   background: #f8f9fa;
   display: flex;
   justify-content: center;

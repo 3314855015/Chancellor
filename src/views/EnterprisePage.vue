@@ -3,6 +3,7 @@
     <EnterpriseNav 
       title="🏢 州牧面板" 
       subtitle="企业匹配 · 人才对接 · 点数使用"
+      @avatar-click="showUserInfoModal = true"
     />
     
     <EnterpriseWelcome @start-recruiting="() => showDescriptionInput = true" />
@@ -80,6 +81,12 @@
 
     <Footer />
 
+    <!-- 用户信息模态框 -->
+    <UserInfoModal 
+      v-model:visible="showUserInfoModal"
+      @close="showUserInfoModal = false"
+    />
+    
     <!-- 学生能力模态框 -->
     <StudentAbilityModal 
       v-if="showAbilityModal" 
@@ -151,6 +158,7 @@ import EnterpriseWelcome from '@/components/Welcome/EnterpriseWelcome.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import StudentAbilityModal from '@/components/Modals/StudentAbilityModal.vue'
 import StudentTaskHistoryModal from '@/components/Modals/StudentTaskHistoryModal.vue'
+import UserInfoModal from '@/components/Modals/UserInfoModal.vue'
 import enterpriseService from '@/services/enterpriseService'
 
 
@@ -162,6 +170,7 @@ const showDescriptionInput = ref(false)
 const showAbilityModal = ref(false)
 const showTaskHistoryModal = ref(false)
 const showMessageModal = ref(false)
+const showUserInfoModal = ref(false)
 const userDescription = ref('')
 const selectedOption = ref(10)
 const isLoading = ref(false)
@@ -691,26 +700,51 @@ const fetchAIRecommendations = async () => {
 }
 
 .main-content {
-  max-width: 1200px;
+  max-width: 1600px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 30px;
 }
 
 .section {
-  margin-bottom: 40px;
+  margin-bottom: 60px;
 }
 
 .section-title {
   text-align: center;
-  font-size: 1.8rem;
+  font-size: 2rem;
   color: #2c3e50;
-  margin-bottom: 30px;
-  font-weight: 600;
+  margin-bottom: 40px;
+  font-weight: 700;
+  position: relative;
+  padding-bottom: 15px;
+}
+
+.section-title::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px;
+  height: 3px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 2px;
 }
 
 .info-card {
-  max-width: 400px;
+  max-width: 500px;
   margin: 0 auto;
+  border-radius: 20px;
+  border: 2px solid #f0f4f8;
+  box-shadow: 0 8px 30px rgba(102, 126, 234, 0.15);
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.info-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 20px 50px rgba(102, 126, 234, 0.25);
+  border-color: #667eea;
 }
 
 .info-item {
