@@ -119,6 +119,12 @@
     </main>
 
     <Footer />
+
+    <!-- 用户管理模态框 -->
+    <UserManagementModal 
+      v-model:visible="showUserManagementModal"
+      @close="showUserManagementModal = false"
+    />
   </div>
 </template>
 
@@ -130,6 +136,7 @@ import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import Footer from '@/components/Footer.vue'
 import AdminWelcome from '@/components/Welcome/AdminWelcome.vue'
+import UserManagementModal from '@/components/Modals/UserManagementModal.vue'
 import adminService from '@/services/adminService'
 import authService from '@/services/authService'
 
@@ -281,8 +288,11 @@ const manageKeys = () => {
   router.push('/admin/keys')
 }
 
+// 用户管理模态框相关
+const showUserManagementModal = ref(false)
+
 const manageUsers = () => {
-  alert('进入用户管理功能')
+  showUserManagementModal.value = true
 }
 
 const viewStatistics = () => {

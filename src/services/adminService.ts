@@ -548,10 +548,191 @@ export const getKeyStatistics = async (creatorId: string): Promise<any> => {
   }
 }
 
+/**
+ * 获取用户列表（管理员功能）
+ */
+export const getUsersList = async (creatorId: string, page: number = 1, pageSize: number = 20, filters?: {
+  role?: string;
+  status?: string;
+  student_status?: string;
+}): Promise<any> => {
+  try {
+    // 验证当前用户是否为管理员
+    const { data: currentUser, error: userError } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', creatorId)
+      .single()
+
+    if (userError || !currentUser) {
+      throw new Error('用户信息获取失败')
+    }
+
+    if (currentUser.role !== 'admin') {
+      throw new Error('只有管理员可以查看用户列表')
+    }
+
+    // 使用优化的RPC函数进行分页查询
+    const { data: usersData, error } = await supabase
+      .rpc('get_users_with_pagination', {
+        p_page: page,
+        p_page_size: pageSize,
+        p_role_filter: filters?.role || null,
+        p_status_filter: filters?.status || null,
+        p_student_status_filter: filters?.student_status || null
+      })
+
+    if (error) {
+      throw new Error(error.message)
+    }
+
+    // 如果没有数据，返回空结果
+    if (!usersData || usersData.length === 0) {
+      return {
+        success: true,
+        message: '获取用户列表成功',
+        data: {
+          users: [],
+          pagination: {
+            page,
+            pageSize,
+            total: 0,
+            totalPages: 0
+          }
+        }
+      }
+    }
+
+    // 从第一条记录中获取分页信息
+    const firstRecord = usersData[0]
+    const totalUsers = firstRecord.total_count || 0
+    const totalPages = firstRecord.total_pages || 1
+
+    // 转换用户数据格式
+    const users = usersData.map(user => ({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      status: user.status,
+      student_status: user.student_status,
+      created_at: user.created_at,
+      updated_at: user.updated_at
+    }))
+
+    return {
+      success: true,
+      message: '获取用户列表成功',
+      data: {
+        users,
+        pagination: {
+          page,
+          pageSize,
+          total: totalUsers,
+          totalPages: totalPages
+        }
+      }
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '获取用户列表失败'
+    return {
+      success: false,
+      message,
+      data: {
+        users: [],
+        pagination: {
+          page,
+          pageSize,
+          total: 0,
+          totalPages: 0
+        }
+      }
+    }
+  }
+}
+
+/**
+ * 更新用户信息（管理员功能）- 使用优化的RPC函数
+ */
+export const updateUser = async (creatorId: string, userId: string, updates: {
+  role?: 'admin' | 'student' | 'enterprise' | 'examiner';
+  status?: 'active' | 'inactive' | 'suspended';
+  student_status?: 'wild' | 'selected';
+}): Promise<any> => {
+  try {
+    // 使用优化的RPC函数进行用户更新
+    const { data: result, error } = await supabase
+      .rpc('update_user_with_admin_permission', {
+        p_admin_id: creatorId,
+        p_target_user_id: userId,
+        p_role: updates.role || null,
+        p_status: updates.status || null,
+        p_student_status: updates.student_status || null
+      })
+
+    if (error) {
+      throw new Error(error.message)
+    }
+
+    // 解析RPC返回结果
+    if (result && result.success) {
+      return {
+        success: true,
+        message: result.message || '用户信息更新成功'
+      }
+    } else {
+      throw new Error(result?.message || '用户信息更新失败')
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '用户信息更新失败'
+    return {
+      success: false,
+      message
+    }
+  }
+}
+
+/**
+ * 暂停用户（管理员功能）- 使用优化的RPC函数（替代删除）
+ */
+export const suspendUser = async (creatorId: string, userId: string): Promise<any> => {
+  try {
+    // 使用优化的RPC函数进行用户暂停
+    const { data: result, error } = await supabase
+      .rpc('suspend_user_with_admin_permission', {
+        p_admin_id: creatorId,
+        p_target_user_id: userId
+      })
+
+    if (error) {
+      throw new Error(error.message)
+    }
+
+    // 解析RPC返回结果
+    if (result && result.success) {
+      return {
+        success: true,
+        message: result.message || '用户已暂停'
+      }
+    } else {
+      throw new Error(result?.message || '暂停用户失败')
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '暂停用户失败'
+    return {
+      success: false,
+      message
+    }
+  }
+}
+
 export default {
   generateKey,
   generateKeysBatch,
   getKeysList,
   deleteKey,
-  getKeyStatistics
+  getKeyStatistics,
+  getUsersList,
+  updateUser,
+  suspendUser
 }
