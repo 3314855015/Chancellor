@@ -1,11 +1,17 @@
 <template>
   <div class="avatar-container">
-    <div class="avatar" @click="toggleDropdown">
+    <div class="avatar" @click="$emit('click')">
       <div class="avatar-icon">
-        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="16" cy="16" r="16" fill="#87CEEB"/>
-          <circle cx="16" cy="12" r="4" fill="#2c3e50"/>
-          <path d="M8 24C8 20 12 18 16 18C20 18 24 20 24 24" stroke="#2c3e50" stroke-width="2" fill="none"/>
+        <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="18" cy="18" r="18" fill="url(#avatarGradient)"/>
+          <circle cx="18" cy="14" r="4" fill="#ffffff"/>
+          <path d="M10 26C10 21 16 18 18 18C20 18 26 21 26 26" stroke="#ffffff" stroke-width="2" fill="none"/>
+          <defs>
+            <linearGradient id="avatarGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#667eea" />
+              <stop offset="100%" stop-color="#764ba2" />
+            </linearGradient>
+          </defs>
         </svg>
       </div>
       <div class="user-info">
@@ -13,33 +19,14 @@
         <span class="role-badge" :class="user?.role">{{ getRoleDisplayName(user?.role) }}</span>
       </div>
     </div>
-    
-    <!-- 下拉菜单 -->
-    <div v-if="showDropdown" class="dropdown-menu">
-      <div class="dropdown-header">
-        <div class="user-details">
-          <strong>{{ user?.username }}</strong>
-          <span class="user-email">{{ user?.email }}</span>
-        </div>
-      </div>
-      <div class="dropdown-divider"></div>
-      <button class="dropdown-item" @click="handleLogout">
-        <span class="dropdown-icon">🚪</span>
-        <span>退出登录</span>
-      </button>
-    </div>
-    
-    <!-- 下拉菜单遮罩 -->
-    <div v-if="showDropdown" class="dropdown-overlay" @click="hideDropdown"></div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { computed } from 'vue'
 import { useAuthStore } from '@/stores/authStore'
 
 const authStore = useAuthStore()
-const showDropdown = ref(false)
 
 const user = computed(() => authStore.user)
 
@@ -53,187 +40,115 @@ const getRoleDisplayName = (role: string | undefined) => {
     default: return '用户'
   }
 }
-
-const toggleDropdown = () => {
-  showDropdown.value = !showDropdown.value
-}
-
-const hideDropdown = () => {
-  showDropdown.value = false
-}
-
-const handleLogout = async () => {
-  try {
-    await authStore.userLogout()
-    hideDropdown()
-    // 退出后刷新页面
-    window.location.reload()
-  } catch (error) {
-    console.error('退出登录失败:', error)
-  }
-}
-
-// 点击外部关闭下拉菜单
-const handleClickOutside = (event: MouseEvent) => {
-  const target = event.target as HTMLElement
-  if (!target.closest('.avatar-container')) {
-    hideDropdown()
-  }
-}
-
-onMounted(() => {
-  document.addEventListener('click', handleClickOutside)
-})
-
-onUnmounted(() => {
-  document.removeEventListener('click', handleClickOutside)
-})
 </script>
 
 <style scoped>
+/* Avatar 容器样式 */
 .avatar-container {
   position: relative;
   display: inline-block;
 }
 
+/* 头像区域样式 - 现代优化 */
 .avatar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.9);
-  border: 2px solid rgba(135, 206, 235, 0.5);
-  border-radius: 20px;
+  gap: 10px;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  border-radius: 24px;
   cursor: pointer;
-  transition: all 0.3s ease;
-  backdrop-filter: blur(10px);
-  min-width: 120px;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  backdrop-filter: blur(15px);
+  min-width: 140px;
+  box-shadow: 
+    0 2px 8px rgba(0, 0, 0, 0.08),
+    0 4px 16px rgba(102, 126, 234, 0.12);
 }
 
 .avatar:hover {
   background: rgba(255, 255, 255, 1);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(135, 206, 235, 0.4);
-  border-color: rgba(135, 206, 235, 0.8);
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 
+    0 8px 25px rgba(102, 126, 234, 0.15),
+    0 4px 12px rgba(0, 0, 0, 0.1);
+  border-color: rgba(102, 126, 234, 0.4);
 }
 
+.avatar:active {
+  transform: translateY(-1px) scale(1.01);
+  transition: all 0.1s ease;
+}
+
+/* 头像图标样式 */
 .avatar-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  background: rgba(135, 206, 235, 0.2);
+  background: rgba(102, 126, 234, 0.1);
+  transition: all 0.3s ease;
 }
 
+.avatar:hover .avatar-icon {
+  transform: scale(1.1);
+  background: rgba(102, 126, 234, 0.15);
+}
+
+/* 用户信息样式 */
 .user-info {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 2px;
+  gap: 3px;
 }
 
 .username {
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   font-weight: 600;
   color: #2c3e50;
-  line-height: 1;
+  line-height: 1.2;
+  letter-spacing: 0.2px;
 }
 
 .role-badge {
-  font-size: 0.7rem;
-  padding: 2px 6px;
-  border-radius: 8px;
+  font-size: 0.75rem;
+  padding: 3px 8px;
+  border-radius: 12px;
   color: white;
   line-height: 1;
+  font-weight: 500;
+  letter-spacing: 0.5px;
 }
 
-.role-badge.admin { background: #e74c3c; }
-.role-badge.examiner { background: #f39c12; }
-.role-badge.enterprise { background: #9b59b6; }
-.role-badge.student { background: #3498db; }
+.role-badge.admin { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+.role-badge.examiner { background: linear-gradient(135deg, #f39c12, #e67e22); }
+.role-badge.enterprise { background: linear-gradient(135deg, #9b59b6, #8e44ad); }
+.role-badge.student { background: linear-gradient(135deg, #3498db, #2980b9); }
 
-.dropdown-menu {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  margin-top: 8px;
-  background: white;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  min-width: 200px;
-  z-index: 1000;
-  animation: dropdownSlideIn 0.2s ease-out;
-}
 
-@keyframes dropdownSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
+
+/* 响应式设计 */
+@media (max-width: 480px) {
+  .modal-content {
+    max-width: 280px;
+    margin: 20px;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+  
+  .avatar {
+    min-width: 120px;
+    padding: 8px 12px;
   }
-}
-
-.dropdown-header {
-  padding: 12px 16px;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.user-details {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.user-details strong {
-  color: #2c3e50;
-  font-size: 0.9rem;
-}
-
-.user-email {
-  color: #7f8c8d;
-  font-size: 0.8rem;
-}
-
-.dropdown-divider {
-  height: 1px;
-  background: #f0f0f0;
-  margin: 4px 0;
-}
-
-.dropdown-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 8px 16px;
-  border: none;
-  background: none;
-  color: #2c3e50;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-  font-size: 0.9rem;
-}
-
-.dropdown-item:hover {
-  background: #f8f9fa;
-}
-
-.dropdown-icon {
-  font-size: 1rem;
-}
-
-.dropdown-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 999;
+  
+  .username {
+    font-size: 0.85rem;
+  }
+  
+  .role-badge {
+    font-size: 0.7rem;
+  }
 }
 </style>

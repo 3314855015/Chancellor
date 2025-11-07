@@ -3,6 +3,7 @@
     <AdminNav 
       title="👑 管理员面板" 
       subtitle="生成密钥 · 管理系统安全"
+      @avatar-click="showUserInfoModal = true"
     />
     
     <AdminWelcome 
@@ -125,6 +126,12 @@
       v-model:visible="showUserManagementModal"
       @close="showUserManagementModal = false"
     />
+
+    <!-- 用户信息模态框 -->
+    <UserInfoModal 
+      v-model:visible="showUserInfoModal"
+      @close="showUserInfoModal = false"
+    />
   </div>
 </template>
 
@@ -137,6 +144,7 @@ import Button from '@/components/Button.vue'
 import Footer from '@/components/Footer.vue'
 import AdminWelcome from '@/components/Welcome/AdminWelcome.vue'
 import UserManagementModal from '@/components/Modals/UserManagementModal.vue'
+import UserInfoModal from '@/components/Modals/UserInfoModal.vue'
 import adminService from '@/services/adminService'
 import authService from '@/services/authService'
 
@@ -151,6 +159,7 @@ const enterpriseButtonDisabled = ref(false)
 const examinerButtonDisabled = ref(false)
 const enterpriseButtonCooldown = ref(0)
 const examinerButtonCooldown = ref(0)
+const showUserInfoModal = ref(false)
 
 // 滚动到密钥生成区域
 const scrollToKeySection = () => {
