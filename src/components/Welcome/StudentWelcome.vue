@@ -88,6 +88,7 @@ const welcomeTitle = computed(() => {
 
 .welcome-content {
   max-width: 900px;
+  min-height: 238px;
   margin: 0 auto;
   position: relative;
   z-index: 1;
