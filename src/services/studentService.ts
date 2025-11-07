@@ -51,6 +51,16 @@ interface EmploymentOpportunity {
   description: string
 }
 
+interface StudentMessage {
+  messageId: string
+  senderId: string
+  senderName: string
+  senderEmail: string
+  messageContent: string
+  createdAt: string
+  isRead: boolean
+}
+
 /**
  * 获取学生个人信息
  */
@@ -687,6 +697,126 @@ export const applyEmploymentOpportunity = async (opportunityId: string): Promise
 }
 
 /**
+ * 更新学生状态（上任或拒绝）
+ */
+export const updateStudentStatus = async (newStatus: 'selected' | 'wild'): Promise<{
+  success: boolean
+  message: string
+  data: null
+}> => {
+  try {
+    const currentUser = authService.getCurrentUser()
+    if (!currentUser) {
+      return {
+        success: false,
+        message: '用户未登录',
+        data: null
+      }
+    }
+
+    // 使用RPC函数更新学生状态
+    const { data, error } = await supabase.rpc('update_student_status', {
+      p_student_id: currentUser.id,
+      p_new_status: newStatus
+    })
+
+    if (error) {
+      throw new Error(error.message)
+    }
+
+    if (data === 'success') {
+      return {
+        success: true,
+        message: newStatus === 'selected' ? '上任成功！状态已更新为中举' : '已拒绝邀请',
+        data: null
+      }
+    } else {
+      throw new Error(data || '状态更新失败')
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '状态更新失败'
+    return {
+      success: false,
+      message,
+      data: null
+    }
+  }
+}
+
+/**
+ * 获取学生收到的企业消息（分页加载）
+ */
+export const getStudentMessages = async (page: number = 1, pageSize: number = 3): Promise<{
+  success: boolean
+  message: string
+  data: {
+    messages: StudentMessage[]
+    currentPage: number
+    totalPages: number
+  }
+}> => {
+  try {
+    const currentUser = authService.getCurrentUser()
+    if (!currentUser) {
+      return {
+        success: false,
+        message: '用户未登录',
+        data: { messages: [], currentPage: 1, totalPages: 1 }
+      }
+    }
+
+    // 使用RPC函数获取学生消息
+    const { data: messagesData, error } = await supabase
+      .rpc('get_student_messages', {
+        p_student_id: currentUser.id,
+        p_page: page,
+        p_page_size: pageSize
+      })
+
+    if (error) {
+      console.warn('获取学生消息失败:', error)
+      // 如果RPC失败，返回空消息列表
+      return {
+        success: true,
+        message: '获取消息成功',
+        data: { messages: [], currentPage: 1, totalPages: 1 }
+      }
+    }
+
+    // 转换消息数据格式
+    const messages: StudentMessage[] = (messagesData || []).map((msg: any) => ({
+      messageId: msg.message_id,
+      senderId: msg.sender_id,
+      senderName: msg.sender_name,
+      senderEmail: msg.sender_email,
+      messageContent: msg.message_content,
+      createdAt: msg.created_at,
+      isRead: msg.is_read
+    }))
+
+    // 由于RPC函数没有返回总页数信息，这里我们假设有更多消息
+    const totalPages = messages.length === pageSize ? page + 1 : page
+
+    return {
+      success: true,
+      message: `获取消息成功（共${messages.length}条）`,
+      data: {
+        messages,
+        currentPage: page,
+        totalPages
+      }
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '获取消息失败'
+    return {
+      success: false,
+      message,
+      data: { messages: [], currentPage: 1, totalPages: 1 }
+    }
+  }
+}
+
+/**
  * 绑定教师（使用教师密钥）
  */
 export const bindTeacher = async (keyValue: string): Promise<{
@@ -1150,5 +1280,7 @@ export default {
   submitTask,
   getEmploymentOpportunities,
   applyEmploymentOpportunity,
-  bindTeacher
+  bindTeacher,
+  getStudentMessages,
+  updateStudentStatus
 }

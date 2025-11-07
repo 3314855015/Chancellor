@@ -15,27 +15,39 @@
       </div>
       
       <div class="layout-container">
-        <!-- 任务发布表单 -->
-        <div class="task-form-section">
-          <div class="form-container">
-            <div class="form-header">
-              <h2>📋 任务信息</h2>
-              <p>填写任务详细信息，设置奖励点数和过期时间</p>
+      <!-- 任务发布表单 -->
+      <div class="task-form-section">
+        <div class="form-container">
+          <div class="form-header">
+            <h2>📋 任务信息</h2>
+            <p>填写任务详细信息，设置奖励点数和过期时间</p>
+          </div>
+          
+          <form @submit.prevent="submitTask" class="task-form">
+            <!-- AI任务生成输入框 -->
+            <div class="form-group">
+              <label for="ai-input">💡 请描述您的需求（用于AI生成任务）</label>
+              <textarea 
+                id="ai-input"
+                v-model="aiInput" 
+                placeholder="例如：我需要一个前端开发任务，要求使用Vue.js框架..."
+                class="form-textarea"
+                rows="2"
+              ></textarea>
             </div>
             
-            <form @submit.prevent="submitTask" class="task-form">
-              <!-- 任务标题 -->
-              <div class="form-group">
-                <label for="task-title">任务标题 *</label>
-                <input 
-                  id="task-title"
-                  v-model="taskForm.title" 
-                  type="text" 
-                  placeholder="请输入任务标题"
-                  class="form-input"
-                  required
-                >
-              </div>
+            <!-- 任务标题 -->
+            <div class="form-group">
+              <label for="task-title">任务标题 *</label>
+              <input 
+                id="task-title"
+                v-model="taskForm.title" 
+                type="text" 
+                placeholder="请输入任务标题"
+                class="form-input"
+                required
+              >
+            </div>
               
               <!-- 任务描述 -->
               <div class="form-group">
@@ -113,6 +125,14 @@
               <!-- 表单操作 -->
               <div class="form-actions">
                 <Button 
+                  label="AI生成" 
+                  variant="outline" 
+                  @click="generateAITask"
+                  :loading="aiLoading"
+                  :disabled="aiLoading"
+                  class="ai-btn"
+                />
+                <Button 
                   label="📤 发布任务" 
                   type="submit" 
                   :loading="loading"
@@ -176,8 +196,10 @@ const router = useRouter()
 
 // 响应式数据
 const loading = ref(false)
+const aiLoading = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
+const aiInput = ref('') // AI任务生成输入框的内容
 
 // 任务表单数据
 const taskForm = ref({
@@ -267,6 +289,66 @@ const submitTask = async () => {
 // 返回教师页面
 const goBack = () => {
   router.push('/examiner')
+}
+
+// AI生成任务
+const generateAITask = async () => {
+  aiLoading.value = true
+  errorMessage.value = ''
+  successMessage.value = ''
+  
+  try {
+    // 获取用户输入
+    const userInput = aiInput.value.trim() || taskForm.value.title || '创建一个技术开发任务'
+    
+    if (!userInput || userInput === '创建一个技术开发任务') {
+      throw new Error('请输入任务需求描述以生成更准确的AI任务')
+    }
+    
+    // 调用n8n AI任务生成API
+    const response = await fetch('http://localhost:5678/webhook-test/ai-create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userInput: userInput
+      })
+    })
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    
+    const result = await response.json()
+    
+    if (result.success && result.generatedTask) {
+      // 填充表单数据
+      taskForm.value.title = result.generatedTask.title
+      taskForm.value.description = result.generatedTask.description
+      taskForm.value.rewardPoints = result.generatedTask.rewardPoints
+      taskForm.value.expiresInMonths = result.generatedTask.expiresInMonths
+      
+      // 设置截止时间（如果AI提供了）
+      if (result.generatedTask.deadline) {
+        taskForm.value.deadline = result.generatedTask.deadline
+      } else {
+        setDefaultDeadline()
+      }
+      
+      successMessage.value = `AI任务生成成功！基于您的需求「${userInput}」生成了任务。`
+    } else {
+      throw new Error(result.message || 'AI任务生成失败')
+    }
+    
+  } catch (error) {
+    console.error('AI任务生成失败:', error)
+    
+    // n8n调用失败，直接显示错误信息
+    errorMessage.value = `AI任务生成失败：${error instanceof Error ? error.message : '未知错误'}`
+  } finally {
+    aiLoading.value = false
+  }
 }
 
 // 设置默认截止时间
@@ -471,8 +553,15 @@ onMounted(() => {
 /* 表单操作 */
 .form-actions {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   margin-top: 20px;
+}
+
+.ai-btn {
+  flex: 0 0 auto;
+  min-width: 100px;
+  color: blueviolet;
+  background-color: rgb(171, 171, 227);
 }
 
 .submit-btn {

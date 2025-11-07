@@ -203,9 +203,9 @@ class EnterpriseService {
   }
 
   /**
-   * 联系学生（消耗企业点数）
+   * 发送消息给学生（使用RPC函数）
    */
-  async contactStudent(studentId: string): Promise<boolean> {
+  async sendMessageToStudent(studentId: string, messageContent: string): Promise<boolean> {
     try {
       // 获取当前企业用户信息
       const currentUser = await authService.getCurrentUser()
@@ -214,14 +214,38 @@ class EnterpriseService {
         return false
       }
 
-      // 这里可以添加点数消耗逻辑
-      // 暂时返回成功
-      console.log(`企业用户 ${currentUser.username} 联系学生 ${studentId}`)
+      // 使用RPC函数发送消息
+      const { data, error } = await supabase.rpc('send_message_to_student', {
+        sender_id: currentUser.id,
+        receiver_id: studentId,
+        message_content: messageContent
+      })
+
+      if (error) {
+        console.error('发送消息失败:', error)
+        return false
+      }
+
+      if (data?.error) {
+        console.error('RPC函数返回错误:', data.error)
+        return false
+      }
+
+      console.log(`企业用户 ${currentUser.username} 发送消息给学生 ${studentId}`)
       return true
     } catch (error) {
-      console.error('联系学生异常:', error)
+      console.error('发送消息异常:', error)
       return false
     }
+  }
+
+  /**
+   * 联系学生（消耗企业点数）- 保留原方法但不再使用
+   */
+  async contactStudent(studentId: string): Promise<boolean> {
+    // 现在改为发送消息功能，此方法已弃用
+    console.warn('contactStudent方法已弃用，请使用sendMessageToStudent方法')
+    return false
   }
 
   /**

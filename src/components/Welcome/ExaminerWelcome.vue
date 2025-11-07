@@ -16,15 +16,23 @@
 </template>
 
 <script setup lang="ts">
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+
 const startSupervising = () => {
-  // 跳转到任务管理功能
-  alert('开始监考 - 进入任务管理')
+  // 跳转到任务管理页面
+  router.push('/examiner/task/manage')
 }
 
 const generateTeacherKey = () => {
-  // 跳转到生成教师密钥功能
-  alert('发榜招生 - 生成教师密钥')
+  // 跳转到生成教师密钥功能（与考官页面中的生成密钥按钮逻辑一致）
+  // 这里通过事件传递到父组件处理
+  emit('generateTeacherKey')
 }
+
+// 定义事件
+const emit = defineEmits(['generateTeacherKey'])
 </script>
 
 <style scoped>

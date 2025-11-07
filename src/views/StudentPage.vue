@@ -5,7 +5,7 @@
       subtitle="接取任务 · 提升能力 · 寻求就业"
     />
     
-    <StudentWelcome />
+    <StudentWelcome :student-status="studentInfo.status" />
     
     <main class="main-content">
       <!-- 消息显示区域 -->
@@ -312,6 +312,109 @@
         </div>
       </section>
 
+      <!-- 企业消息 -->
+      <section class="section">
+        <h2 class="section-title">✉️ 企业消息</h2>
+        
+        <!-- 消息加载状态 -->
+        <div v-if="loadingMessages" class="messages-loading">
+          <div class="loading-content">
+            <span class="loading-icon">⏳</span>
+            <p>正在加载企业消息...</p>
+          </div>
+        </div>
+        
+        <!-- 悬浮消息卡片容器 -->
+        <div v-else-if="studentMessages.length > 0" class="floating-message-cards">
+          <div class="cards-container">
+            <div v-for="message in studentMessages" :key="message.messageId" class="message-card" :data-message-id="message.messageId">
+              <div class="message-header">
+                <div class="message-avatar">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                  </svg>
+                </div>
+                <div class="message-info">
+                  <h3>{{ message.senderName }}</h3>
+                  <p class="contact-info">📧 {{ message.senderEmail }}</p>
+                </div>
+                <div class="message-meta">
+                  <span class="message-time">{{ formatMessageTime(message.createdAt) }}</span>
+                  <span v-if="!message.isRead" class="unread-badge">新</span>
+                </div>
+              </div>
+              <div class="message-content">
+                <p>{{ message.messageContent }}</p>
+              </div>
+              
+              <!-- 操作按钮 -->
+              <div class="message-actions">
+                <button 
+                  class="accept-btn"
+                  @click="handleAccept(message)"
+                  :disabled="message.isProcessed"
+                >
+                  上任
+                </button>
+                <button 
+                  class="reject-btn"
+                  @click="handleReject(message)"
+                  :disabled="message.isProcessed"
+                >
+                  拒绝
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 消息分页 -->
+          <div class="messages-pagination">
+            <div class="pagination-info">
+              第 {{ messagesCurrentPage }} 页 / 共 {{ messagesTotalPages }} 页
+            </div>
+            <div class="pagination-controls">
+              <Button 
+                label="上一页" 
+                variant="secondary"
+                @click="loadMessages(messagesCurrentPage - 1)"
+                :disabled="messagesCurrentPage <= 1"
+                size="small"
+              />
+              
+              <div class="page-numbers">
+                <button 
+                  v-for="page in visibleMessagePages" 
+                  :key="page"
+                  class="page-btn"
+                  :class="{ active: page === messagesCurrentPage }"
+                  @click="loadMessages(page)"
+                >
+                  {{ page }}
+                </button>
+                <span v-if="showMessageEllipsis" class="page-ellipsis">...</span>
+              </div>
+              
+              <Button 
+                label="下一页" 
+                variant="secondary"
+                @click="loadMessages(messagesCurrentPage + 1)"
+                :disabled="messagesCurrentPage >= messagesTotalPages"
+                size="small"
+              />
+            </div>
+          </div>
+        </div>
+        
+        <!-- 无消息状态 -->
+        <div v-else class="no-messages">
+          <div class="no-messages-content">
+            <span class="no-messages-icon">📭</span>
+            <h4>暂无企业消息</h4>
+            <p>目前没有企业发送的消息，请耐心等待机会</p>
+          </div>
+        </div>
+      </section>
+
       <!-- 就业机会 -->
       <section class="section">
         <h2 class="section-title">💼 就业机会</h2>
@@ -399,6 +502,13 @@ const tasks = ref<any[]>([])
 // 就业机会数据
 const employmentOpportunities = ref<any[]>([])
 
+// 企业消息数据
+const studentMessages = ref<any[]>([])
+const loadingMessages = ref(false)
+const messagesCurrentPage = ref(1)
+const messagesPageSize = ref(3) // 每页显示3个消息
+const messagesTotalPages = ref(1)
+
 // 计算属性：根据标签过滤任务
 const filteredTasks = computed(() => {
   if (activeTab.value === 'completed') {
@@ -440,6 +550,30 @@ const visiblePages = computed(() => {
 const showEllipsis = computed(() => {
   return totalPages.value > visiblePages.value.length && 
          visiblePages.value[visiblePages.value.length - 1] < totalPages.value
+})
+
+// 消息相关的计算属性
+const visibleMessagePages = computed(() => {
+  const pages = []
+  const maxVisiblePages = 5
+  
+  let startPage = Math.max(1, messagesCurrentPage.value - Math.floor(maxVisiblePages / 2))
+  let endPage = Math.min(messagesTotalPages.value, startPage + maxVisiblePages - 1)
+  
+  if (endPage - startPage + 1 < maxVisiblePages) {
+    startPage = Math.max(1, endPage - maxVisiblePages + 1)
+  }
+  
+  for (let i = startPage; i <= endPage; i++) {
+    pages.push(i)
+  }
+  
+  return pages
+})
+
+const showMessageEllipsis = computed(() => {
+  return messagesTotalPages.value > visibleMessagePages.value.length && 
+         visibleMessagePages.value[visibleMessagePages.value.length - 1] < messagesTotalPages.value
 })
 
 // 获取学生状态文本
@@ -718,6 +852,100 @@ const updateAbilityValue = async (abilityIndex: number, newValue: number) => {
   }
 }
 
+// 加载学生消息
+const loadMessages = async (page: number) => {
+  try {
+    loadingMessages.value = true
+    
+    const response = await studentService.getStudentMessages(page, messagesPageSize.value)
+    
+    if (response.success) {
+      studentMessages.value = response.data.messages.map((msg: any) => ({
+        ...msg,
+        isProcessed: false // 添加处理状态标记
+      }))
+      messagesCurrentPage.value = response.data.currentPage
+      messagesTotalPages.value = response.data.totalPages
+    } else {
+      throw new Error(response.message)
+    }
+  } catch (error) {
+    console.error('加载消息失败:', error)
+    // 不显示错误消息，避免干扰用户体验
+  } finally {
+    loadingMessages.value = false
+  }
+}
+
+// 格式化消息时间
+const formatMessageTime = (timestamp: string) => {
+  const now = new Date()
+  const messageTime = new Date(timestamp)
+  const diffMs = now.getTime() - messageTime.getTime()
+  const diffMins = Math.floor(diffMs / (1000 * 60))
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  
+  if (diffMins < 1) {
+    return '刚刚'
+  } else if (diffMins < 60) {
+    return `${diffMins}分钟前`
+  } else if (diffHours < 24) {
+    return `${diffHours}小时前`
+  } else if (diffDays < 7) {
+    return `${diffDays}天前`
+  } else {
+    return messageTime.toLocaleDateString('zh-CN')
+  }
+}
+
+// 上任处理函数
+const handleAccept = async (message: any) => {
+  try {
+    // 更新前端状态
+    message.isProcessed = true
+    
+    // 使用RPC函数更新数据库状态
+    const response = await studentService.updateStudentStatus('selected')
+    
+    if (response.success) {
+      // 更新学生状态显示
+      await loadStudentInfo()
+      successMessage.value = '上任成功！您的状态已更新为中举'
+      
+      // 添加已处理样式
+      const messageCard = document.querySelector(`.message-card[data-message-id="${message.messageId}"]`)
+      if (messageCard) {
+        messageCard.classList.add('processed')
+      }
+    } else {
+      throw new Error(response.message)
+    }
+  } catch (error) {
+    console.error('上任处理失败:', error)
+    // 恢复状态
+    message.isProcessed = false
+    errorMessage.value = error instanceof Error ? error.message : '上任处理失败'
+  }
+}
+
+// 拒绝处理函数
+const handleReject = (message: any) => {
+  // 标记为已处理
+  message.isProcessed = true
+  
+  // 在控制台输出
+  console.log('已拒绝')
+  
+  // 添加已处理样式
+  const messageCard = document.querySelector(`.message-card[data-message-id="${message.messageId}"]`)
+  if (messageCard) {
+    messageCard.classList.add('processed')
+  }
+  
+  successMessage.value = '已拒绝该邀请'
+}
+
 // 组件挂载时加载所有数据
 onMounted(async () => {
   await Promise.all([
@@ -727,6 +955,7 @@ onMounted(async () => {
     loadStudentTasks(),
     loadEmploymentOpportunities()
   ])
+  loadMessages(1) // 加载第一页消息
 })
 </script>
 
@@ -1049,6 +1278,18 @@ onMounted(async () => {
 /* 任务网格容器 */
 .tasks-grid-container {
   min-height: 300px;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e9ecef;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+  padding: 25px;
+}
+
+.tasks-grid-container:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  border-color: #87CEEB;
 }
 
 .tasks-grid {
@@ -1207,7 +1448,7 @@ onMounted(async () => {
   align-items: center;
   gap: 15px;
   padding: 20px;
-  background: #f8f9fa;
+  background: white;
   border-radius: 8px;
   margin-top: 20px;
 }
@@ -1508,4 +1749,386 @@ onMounted(async () => {
     width: 100%;
   }
 }
+
+/* 企业消息样式 */
+.messages-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 40px 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin: 20px 0;
+}
+
+.loading-content {
+  text-align: center;
+  color: #6c757d;
+}
+
+.loading-icon {
+  font-size: 2rem;
+  margin-bottom: 10px;
+  display: block;
+}
+
+/* 悬浮消息卡片样式 */
+.floating-message-cards {
+  position: relative;
+  background: white;
+  padding: 40px 20px;
+  margin-bottom: 40px;
+  animation: slideDown 0.5s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.cards-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e9ecef;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+  padding: 25px;
+}
+
+.cards-container:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  border-color: #87CEEB;
+}
+
+.message-card {
+  background: white;
+  border-radius: 16px;
+  padding: 25px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(135, 206, 235, 0.3);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 280px;
+  width: 100%;
+  max-width: 380px;
+}
+
+.message-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+}
+
+.message-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+  gap: 15px;
+}
+
+.message-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #2c3e50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
+}
+
+.message-avatar svg {
+  width: 40px;
+  height: 40px;
+  fill: #95a5a6;
+}
+
+.message-info h3 {
+  margin: 0 0 5px 0;
+  font-size: 1.3rem;
+  color: #2c3e50;
+  font-weight: 600;
+  flex: 1;
+}
+
+.contact-info {
+  margin: 0;
+  color: #7f8c8d;
+  font-size: 0.9rem;
+  background: rgba(135, 206, 235, 0.1);
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.message-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.message-time {
+  color: #adb5bd;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.unread-badge {
+  background: #87CEEB;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: bold;
+}
+
+.message-content {
+  margin-bottom: 0;
+  line-height: 1.6;
+  color: #5a6c7d;
+  font-size: 0.95rem;
+  background: rgba(135, 206, 235, 0.05);
+  padding: 15px;
+  border-radius: 8px;
+  border-left: 4px solid #87CEEB;
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  overflow-y: auto;
+  max-height: 160px;
+}
+
+.no-messages {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 60px 20px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border: 1px solid #dee2e6;
+  border-radius: 12px;
+  margin: 20px 0;
+}
+
+.no-messages-content {
+  text-align: center;
+}
+
+.no-messages-icon {
+  font-size: 3rem;
+  margin-bottom: 15px;
+  display: block;
+  opacity: 0.7;
+}
+
+.no-messages h4 {
+  margin: 0 0 10px;
+  color: #495057;
+  font-size: 1.2rem;
+}
+
+.no-messages p {
+  margin: 0;
+  color: #6c757d;
+  font-size: 0.95rem;
+}
+
+.messages-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  background: white;
+  border-radius: 8px;
+  margin-top: 20px;
+}
+
+.pagination-info {
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+/* 企业消息响应式设计 */
+@media (max-width: 768px) {
+  .messages-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+  
+  .message-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .message-meta {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .messages-pagination {
+    flex-direction: column;
+    gap: 15px;
+    text-align: center;
+  }
+  
+  .pagination-controls {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 1200px) {
+  .cards-container {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+  
+  .message-card {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .cards-container {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .message-card {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 1200px) {
+  .cards-container {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+  
+  .message-card {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .cards-container {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .message-card {
+    max-width: 100%;
+  }
+}
+
+/* 消息操作按钮样式 */
+.message-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+  justify-content: space-between;
+}
+
+.accept-btn {
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex: 1;
+}
+
+.accept-btn:hover:not(:disabled) {
+  background: #0056b3;
+  transform: translateY(-1px);
+}
+
+.accept-btn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.reject-btn {
+  background: white;
+  color: #6c757d;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  padding: 10px 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex: 1;
+}
+
+.reject-btn:hover:not(:disabled) {
+  background: #f8f9fa;
+  border-color: #adb5bd;
+  transform: translateY(-1px);
+}
+
+.reject-btn:disabled {
+  color: #adb5bd;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* 已处理消息的样式 */
+.message-card.processed {
+  opacity: 0.7;
+  background: #f8f9fa;
+}
+
+.message-card.processed .message-actions {
+  opacity: 0.5;
+}
+
+@media (max-width: 480px) {
+  .message-card {
+    padding: 15px;
+  }
+  
+  .messages-pagination {
+    padding: 15px;
+  }
+  
+  .message-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .accept-btn,
+  .reject-btn {
+    width: 100%;
+  }
+}
+
 </style>

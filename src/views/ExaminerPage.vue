@@ -5,7 +5,7 @@
       subtitle="发布任务 · 评审学生 · 分配点数"
     />
     
-    <ExaminerWelcome />
+    <ExaminerWelcome @generateTeacherKey="generateTeacherKey" />
     
     <main class="main-layout">
       <!-- 消息显示区域 -->
@@ -159,15 +159,19 @@
                     <span class="task-status" :class="task.status">{{ task.statusText }}</span>
                   </div>
                 </template>
-                <p class="task-desc">{{ task.description }}</p>
-                <div class="task-info">
-                  <span>接取人数: {{ task.participants }}</span>
-                  <span>奖励点数: {{ task.reward }}点</span>
+                <div class="task-content">
+                  <div class="task-desc-container">
+                    <p class="task-desc">{{ task.description }}</p>
+                  </div>
+                  <div class="task-info">
+                    <span>接取人数: {{ task.participants }}</span>
+                    <span>奖励点数: {{ task.reward }}点</span>
+                  </div>
                 </div>
                 <template #footer>
                   <div class="task-actions">
-                    <Button label="评审" size="small" @click="reviewTask(task)" />
-                    <Button label="编辑" size="small" variant="secondary" @click="editTask(task)" />
+                    <Button label="评审" size="small" @click="router.push('/examiner/task/manage')" />
+                    <Button label="编辑" size="small" variant="secondary" @click="router.push('/examiner/task/manage')" />
                   </div>
                 </template>
               </Card>
@@ -307,6 +311,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import ExaminerNav from '@/components/Nav/ExaminerNav.vue'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
@@ -315,6 +320,8 @@ import ExaminerWelcome from '@/components/Welcome/ExaminerWelcome.vue'
 import examinerService from '@/services/examinerService'
 import authService from '@/services/authService'
 import { supabase } from '@/lib/supabase.client'
+
+const router = useRouter()
 
 const showAssignAbilityModal = ref(false)
 const showConfirmDialog = ref(false)
@@ -1136,6 +1143,10 @@ onMounted(async () => {
   background: #f8f9fa;
   border-radius: 12px;
   padding: 25px;
+  height: fit-content;
+  min-height: 600px;
+  display: flex;
+  flex-direction: column;
 }
 
 .bulletin-header {
@@ -1143,16 +1154,59 @@ onMounted(async () => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+  flex-shrink: 0;
 }
 
 .task-list {
   display: flex;
   flex-direction: column;
   gap: 15px;
+  flex: 1;
+  min-height: 500px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.task-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.task-list::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.task-list::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.task-list::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
 }
 
 .task-card {
   text-align: left;
+  min-height: 280px;
+  max-height: 320px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.task-card .el-card__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  min-height: 180px;
+}
+
+.task-card .el-card__footer {
+  padding: 12px 16px;
+  border-top: 1px solid #ebeef5;
+  flex-shrink: 0;
+  background: #f8f9fa;
 }
 
 .task-header {
@@ -1185,24 +1239,56 @@ onMounted(async () => {
   color: #c62828;
 }
 
+.task-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 80px;
+  max-height: 160px;
+}
+
+.task-desc-container {
+  flex: 1;
+  margin-bottom: 8px;
+  min-height: 40px;
+  max-height: 80px;
+  overflow: hidden;
+}
+
 .task-desc {
   color: #7f8c8d;
-  margin-bottom: 10px;
   line-height: 1.5;
   font-size: 0.9rem;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word;
 }
 
 .task-info {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 15px;
-  font-size: 0.9rem;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
   color: #95a5a6;
+  flex-shrink: 0;
+  padding: 5px 0;
+  border-top: 1px solid #eaeaea;
 }
 
 .task-actions {
   display: flex;
+  justify-content: space-between;
   gap: 10px;
+  flex-shrink: 0;
+}
+
+.task-actions .el-button {
+  flex: 1;
 }
 
 /* 模态框样式 */

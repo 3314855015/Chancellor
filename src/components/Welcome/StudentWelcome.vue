@@ -1,7 +1,7 @@
 <template>
-  <div class="student-welcome">
+  <div class="student-welcome" :class="studentStatus">
     <div class="welcome-content">
-      <h1 class="welcome-title">噫！好！我中了！</h1>
+      <h1 class="welcome-title">{{ welcomeTitle }}</h1>
       <div class="status-display" :class="studentStatus">
         <span class="status-icon">{{ statusIcon }}</span>
         <span class="status-text">{{ statusText }}</span>
@@ -13,25 +13,29 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 
-// 学生状态，从props或store获取
-const studentStatus = ref('wild') // 'wild' 在野, 'selected' 中举
+// 从父组件传递学生状态
+const props = defineProps({
+  studentStatus: {
+    type: String,
+    default: 'wild' // 'wild' 在野, 'selected' 中举
+  }
+})
 
 const statusIcon = computed(() => {
-  return studentStatus.value === 'wild' ? '📜' : '🏆'
+  return props.studentStatus === 'wild' ? '📜' : '🏆'
 })
 
 const statusText = computed(() => {
-  return studentStatus.value === 'wild' ? '范进中举' : '金榜题名'
+  return props.studentStatus === 'wild' ? '范进中举' : '榜上有名'
 })
 
-// 状态切换（根据真实数据）
-// 这里应该根据实际的用户状态数据来设置
+const welcomeTitle = computed(() => {
+  return props.studentStatus === 'wild' ? '噫！好！我中了！' : '恭喜您可以撑地了！'
+})
 </script>
 
 <style scoped>
 .student-welcome {
-  background: linear-gradient(135deg, #e1bee7 0%, #ce93d8 30%, #ba68c8 100%);
-  color: #4a148c;
   padding: 6rem 2rem;
   text-align: center;
   margin-bottom: 4rem;
@@ -39,6 +43,18 @@ const statusText = computed(() => {
   overflow: hidden;
   animation: gradientShift 8s ease infinite;
   background-size: 400% 400%;
+}
+
+/* 在野状态样式 */
+.student-welcome.wild {
+  background: linear-gradient(135deg, #e1bee7 0%, #ce93d8 30%, #ba68c8 100%);
+  color: #4a148c;
+}
+
+/* 中举状态样式 - 深蓝渐变 */
+.student-welcome.selected {
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 30%, #3b82f6 100%);
+  color: #ffffff;
 }
 
 @keyframes gradientShift {
@@ -82,11 +98,23 @@ const statusText = computed(() => {
   font-weight: 800;
   margin: 0 0 2rem 0;
   text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.3);
+  animation: titleGlow 3s ease-in-out infinite;
+}
+
+/* 在野状态标题样式 */
+.student-welcome.wild .welcome-title {
   background: linear-gradient(135deg, #4a148c 0%, #7b1fa2 100%);
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: titleGlow 3s ease-in-out infinite;
+}
+
+/* 中举状态标题样式 - 金色渐变 */
+.student-welcome.selected .welcome-title {
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 50%, #ffd700 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 @keyframes titleGlow {

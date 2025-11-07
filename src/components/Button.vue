@@ -16,7 +16,7 @@
 <script setup lang="ts">
 interface Props {
   label: string
-  variant?: 'primary' | 'secondary' | 'success' | 'warning' | 'danger'
+  variant?: 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'outline'
   size?: 'small' | 'medium' | 'large'
   icon?: string
   disabled?: boolean
@@ -91,6 +91,12 @@ const onClick = (event: MouseEvent) => {
   background: linear-gradient(135deg, #F44336 0%, #EF5350 100%);
   color: white;
   border-color: #E53935;
+}
+
+.btn.outline {
+  background: transparent;
+  color: #8B5CF6;
+  border-color: #8B5CF6;
 }
 
 /* Sizes */

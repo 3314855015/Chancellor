@@ -93,11 +93,56 @@
       :student-id="selectedStudentId"
       @close="showTaskHistoryModal = false"
     />
+
+    <!-- 发送消息模态框 -->
+    <div v-if="showMessageModal" class="message-modal-overlay" @click="showMessageModal = false">
+      <div class="message-modal-content" @click.stop>
+        <div class="message-modal-header">
+          <div class="message-modal-icon">✉️</div>
+          <h3>发送消息给 {{ selectedStudentForMessage?.name }}</h3>
+          <button class="message-modal-close" @click="showMessageModal = false">×</button>
+        </div>
+        
+        <div class="message-modal-body">
+          <div class="message-input-wrapper">
+            <div class="message-input-label">
+              <span class="label-text">消息内容</span>
+              <span class="character-count">{{ messageContent.length }}/500</span>
+            </div>
+            <textarea 
+              ref="messageTextarea"
+              v-model="messageContent" 
+              placeholder="请输入您想发送的消息内容..."
+              rows="5"
+              maxlength="500"
+              class="message-textarea"
+              @input="handleMessageInput"
+            ></textarea>
+          </div>
+          
+          <div class="message-preview">
+            <div class="preview-header">预览：</div>
+            <div class="preview-content">{{ messageContent || '消息内容将在这里显示...' }}</div>
+          </div>
+        </div>
+        
+        <div class="message-modal-footer">
+          <Button label="取消" variant="secondary" @click="showMessageModal = false" class="cancel-btn" />
+          <Button 
+            label="发送消息" 
+            @click="sendMessage" 
+            :disabled="!messageContent.trim()"
+            class="send-btn"
+            :class="{ 'disabled': !messageContent.trim() }"
+          />
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import EnterpriseNav from '@/components/Nav/EnterpriseNav.vue'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
@@ -116,10 +161,13 @@ const showStudentCards = ref(false)
 const showDescriptionInput = ref(false)
 const showAbilityModal = ref(false)
 const showTaskHistoryModal = ref(false)
+const showMessageModal = ref(false)
 const userDescription = ref('')
 const selectedOption = ref(10)
 const isLoading = ref(false)
 const selectedStudentId = ref('')
+const selectedStudentForMessage = ref<any>(null)
+const messageContent = ref('')
 const pageContainer = ref<HTMLElement | null>(null)
 const filter = ref({
   skill: '',
@@ -128,7 +176,7 @@ const filter = ref({
 
 // 计算属性：判断是否有模态框打开
 const isModalOpen = computed(() => {
-  return showDescriptionInput.value || isLoading.value
+  return showDescriptionInput.value || isLoading.value || showMessageModal.value
 })
 
 const enterpriseInfo = ref({
@@ -204,21 +252,98 @@ const contactStudent = async (student: any) => {
     return
   }
   
-  if (enterpriseInfo.value.points < 1) {
-    alert('点数不足，请先购买点数')
+  // 打开发送消息模态框
+  selectedStudentForMessage.value = student
+  messageContent.value = ''
+  showMessageModal.value = true
+  
+  // 模态框打开后自动聚焦到文本框
+  nextTick(() => {
+    const textarea = document.querySelector('.message-textarea') as HTMLTextAreaElement
+    if (textarea) {
+      textarea.focus()
+    }
+  })
+}
+
+const handleMessageInput = () => {
+  // 字符计数处理
+  if (messageContent.value.length > 500) {
+    messageContent.value = messageContent.value.slice(0, 500)
+  }
+}
+
+const sendMessage = async () => {
+  if (!selectedStudentForMessage.value || !messageContent.value.trim()) {
+    // 使用更友好的提示
+    showMessageNotification('请填写消息内容', 'warning')
     return
   }
   
   try {
-    // 调用企业服务联系学生
-    await enterpriseService.contactStudent(student.id)
+    // 显示发送中状态
+    showMessageNotification('正在发送消息...', 'info')
     
-    // 扣除点数
-    enterpriseInfo.value.points -= 1
-    alert(`已联系 ${student.name}，消耗1点，剩余${enterpriseInfo.value.points}点`)
+    // 调用服务发送消息
+    const success = await enterpriseService.sendMessageToStudent(
+      selectedStudentForMessage.value.id,
+      messageContent.value
+    )
+    
+    if (success) {
+      // 发送成功提示
+      showMessageNotification(`✅ 消息已成功发送给 ${selectedStudentForMessage.value.name}`, 'success')
+      showMessageModal.value = false
+      messageContent.value = ''
+    } else {
+      showMessageNotification('❌ 发送消息失败，请稍后重试', 'error')
+    }
   } catch (error) {
-    console.error('联系学生失败:', error)
-    alert('联系学生失败，请稍后重试')
+    showMessageNotification('❌ 发送消息失败，请检查网络连接', 'error')
+  }
+}
+
+// 显示消息通知的辅助函数
+const showMessageNotification = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+  // 创建通知元素
+  const notification = document.createElement('div')
+  notification.className = `message-notification message-notification-${type}`
+  
+  // 设置消息内容和样式
+  notification.innerHTML = `
+    <div class="notification-content">
+      <span class="notification-icon">${getNotificationIcon(type)}</span>
+      <span class="notification-message">${message}</span>
+    </div>
+  `
+  
+  // 添加到页面
+  document.body.appendChild(notification)
+  
+  // 显示动画
+  setTimeout(() => {
+    notification.classList.add('show')
+  }, 10)
+  
+  // 3秒后自动消失
+  setTimeout(() => {
+    notification.classList.remove('show')
+    setTimeout(() => {
+      if (notification.parentNode) {
+        document.body.removeChild(notification)
+      }
+    }, 300)
+  }, 3000)
+}
+
+// 获取通知图标
+const getNotificationIcon = (type: string) => {
+  switch (type) {
+    case 'success': return '✅'
+    case 'error': return '❌'
+    case 'warning': return '⚠️'
+    case 'info': return 'ℹ️'
+    default: return '💬'
   }
 }
 
@@ -851,20 +976,355 @@ const fetchAIRecommendations = async () => {
   height: 100vh;
   position: fixed;
   width: 100%;
-  pointer-events: none;
 }
 
-.enterprise-page.no-scroll > * {
+/* 只禁用背景内容的交互，模态框除外 */
+.enterprise-page.no-scroll > *:not(.message-modal-overlay):not(.modal-overlay):not(.loading-overlay) {
   pointer-events: none;
 }
 
 .enterprise-page.no-scroll .modal-overlay,
-.enterprise-page.no-scroll .loading-overlay {
+.enterprise-page.no-scroll .loading-overlay,
+.enterprise-page.no-scroll .message-modal-overlay {
   pointer-events: auto;
 }
 
 .enterprise-page.no-scroll .modal-content,
-.enterprise-page.no-scroll .loading-spinner {
+.enterprise-page.no-scroll .loading-spinner,
+.enterprise-page.no-scroll .message-modal-content {
   pointer-events: auto;
+}
+
+/* 消息模态框样式 - 现代美观设计 */
+.message-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: modalFadeIn 0.3s ease-out;
+}
+
+.message-modal-content {
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow: hidden;
+  animation: modalSlideIn 0.3s ease-out;
+  border: 1px solid rgba(135, 206, 235, 0.2);
+}
+
+.message-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 30px 20px;
+  border-bottom: 1px solid rgba(135, 206, 235, 0.2);
+  background: linear-gradient(135deg, #f8fafc 0%, #e3f2fd 100%);
+}
+
+.message-modal-icon {
+  font-size: 2rem;
+  margin-right: 15px;
+}
+
+.message-modal-header h3 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 1.3rem;
+  font-weight: 600;
+  flex: 1;
+}
+
+.message-modal-close {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  color: #7f8c8d;
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  line-height: 1;
+}
+
+.message-modal-close:hover {
+  background: rgba(135, 206, 235, 0.1);
+  color: #3498db;
+  transform: rotate(90deg);
+}
+
+.message-modal-body {
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+}
+
+.message-input-wrapper {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 20px;
+  border: 2px solid rgba(135, 206, 235, 0.1);
+  transition: all 0.3s ease;
+}
+
+.message-input-wrapper:focus-within {
+  border-color: #87CEEB;
+  box-shadow: 0 0 0 3px rgba(135, 206, 235, 0.1);
+}
+
+.message-input-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.label-text {
+  font-weight: 600;
+  color: #2c3e50;
+  font-size: 1rem;
+}
+
+.character-count {
+  font-size: 0.9rem;
+  color: #7f8c8d;
+  font-weight: 500;
+}
+
+.message-textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 15px;
+  border: 2px solid rgba(135, 206, 235, 0.2);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 1rem;
+  line-height: 1.5;
+  resize: vertical;
+  transition: all 0.3s ease;
+  background: white;
+}
+
+.message-textarea:focus {
+  outline: none;
+  border-color: #87CEEB;
+  box-shadow: 0 0 0 3px rgba(135, 206, 235, 0.1);
+}
+
+.message-textarea::placeholder {
+  color: #95a5a6;
+}
+
+.message-preview {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 20px;
+  border: 2px solid rgba(135, 206, 235, 0.1);
+}
+
+.preview-header {
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 10px;
+  font-size: 0.95rem;
+}
+
+.preview-content {
+  color: #5a6c7d;
+  line-height: 1.5;
+  min-height: 60px;
+  padding: 10px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid rgba(135, 206, 235, 0.2);
+  font-size: 0.95rem;
+}
+
+.message-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 15px;
+  padding: 20px 30px;
+  border-top: 1px solid rgba(135, 206, 235, 0.2);
+  background: #f8fafc;
+}
+
+.cancel-btn {
+  background: #95a5a6;
+  border: none;
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.cancel-btn:hover {
+  background: #7f8c8d;
+  transform: translateY(-1px);
+}
+
+.send-btn {
+  background: linear-gradient(135deg, #87CEEB 0%, #3498db 100%);
+  border: none;
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(135, 206, 235, 0.4);
+}
+
+.send-btn:hover:not(.disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(135, 206, 235, 0.6);
+}
+
+.send-btn.disabled {
+  background: #bdc3c7;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@media (max-width: 768px) {
+  .message-modal-content {
+    width: 95%;
+    margin: 20px;
+  }
+  
+  .message-modal-body {
+    padding: 20px;
+  }
+  
+  .message-modal-footer {
+    flex-direction: column;
+  }
+  
+  .message-modal-header {
+    padding: 20px;
+  }
+}
+
+/* 消息通知样式 */
+.message-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 2000;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  padding: 16px 20px;
+  min-width: 280px;
+  max-width: 400px;
+  transform: translateX(400px);
+  opacity: 0;
+  transition: all 0.3s ease-in-out;
+  border-left: 4px solid #3498db;
+  backdrop-filter: blur(10px);
+}
+
+.message-notification.show {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.message-notification-success {
+  border-left-color: #2ecc71;
+  background: linear-gradient(135deg, #f8fff9 0%, #e8f5e8 100%);
+}
+
+.message-notification-error {
+  border-left-color: #e74c3c;
+  background: linear-gradient(135deg, #fff8f8 0%, #f5e8e8 100%);
+}
+
+.message-notification-warning {
+  border-left-color: #f39c12;
+  background: linear-gradient(135deg, #fffbf0 0%, #f5f0e8 100%);
+}
+
+.message-notification-info {
+  border-left-color: #3498db;
+  background: linear-gradient(135deg, #f0f8ff 0%, #e8f0f5 100%);
+}
+
+.notification-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.notification-icon {
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+
+.notification-message {
+  color: #2c3e50;
+  font-weight: 500;
+  line-height: 1.4;
+  font-size: 0.95rem;
+}
+
+.message-notification-success .notification-message {
+  color: #27ae60;
+}
+
+.message-notification-error .notification-message {
+  color: #c0392b;
+}
+
+.message-notification-warning .notification-message {
+  color: #d35400;
+}
+
+.message-notification-info .notification-message {
+  color: #2980b9;
+}
+
+@media (max-width: 768px) {
+  .message-notification {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    min-width: auto;
+    max-width: none;
+    transform: translateY(-100px);
+  }
+  
+  .message-notification.show {
+    transform: translateY(0);
+  }
 }
 </style>
