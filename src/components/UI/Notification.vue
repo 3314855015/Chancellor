@@ -81,23 +81,27 @@ onMounted(() => {
 <style scoped>
 .notification {
   position: fixed;
-  top: 24px;
+  bottom: 24px;
   right: 24px;
   z-index: 10000;
-  min-width: 320px;
-  max-width: 480px;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-  animation: slideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  transform: translateX(0);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  width: 320px;
+  max-width: calc(100vw - 48px);
+  border-radius: 16px;
+  box-shadow: 
+    0 12px 40px rgba(0, 0, 0, 0.15),
+    0 4px 12px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  animation: slideInUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform: translateY(0);
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  backdrop-filter: blur(16px);
+  border: 2px solid rgba(255, 255, 255, 0.3);
   overflow: hidden;
+  transform-origin: bottom right;
 }
 
 .notification.hiding {
-  transform: translateX(120%);
+  transform: translateY(120%) scale(0.9);
   opacity: 0;
 }
 
@@ -129,8 +133,9 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
+  padding: 20px 24px;
   position: relative;
+  min-height: 80px;
 }
 
 .notification-content::before {
@@ -139,65 +144,76 @@ onMounted(() => {
   top: 0;
   left: 0;
   right: 0;
-  height: 2px;
-  background: rgba(255, 255, 255, 0.3);
+  height: 3px;
+  background: linear-gradient(90deg, 
+    rgba(255, 255, 255, 0.6) 0%, 
+    rgba(255, 255, 255, 0.8) 50%, 
+    rgba(255, 255, 255, 0.6) 100%);
+  filter: drop-shadow(0 2px 4px rgba(255, 255, 255, 0.3));
 }
 
 .notification-message {
   flex: 1;
-  font-size: 0.95rem;
-  line-height: 1.5;
+  font-size: 1rem;
+  line-height: 1.6;
   font-weight: 500;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  padding-right: 8px;
 }
 
 .notification-close {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.25);
   border: none;
-  font-size: 1.1rem;
+  font-size: 1.2rem;
   color: white;
   cursor: pointer;
   margin-left: 16px;
-  padding: 4px;
-  width: 24px;
-  height: 24px;
+  padding: 6px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
-  opacity: 0.8;
-  transition: all 0.2s ease;
-  backdrop-filter: blur(4px);
+  border-radius: 8px;
+  opacity: 0.9;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-weight: 600;
 }
 
 .notification-close:hover {
   opacity: 1;
-  background: rgba(255, 255, 255, 0.3);
-  transform: scale(1.05);
+  background: rgba(255, 255, 255, 0.4);
+  transform: scale(1.1);
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
 }
 
 .notification-close:active {
   transform: scale(0.95);
+  background: rgba(255, 255, 255, 0.2);
 }
 
-@keyframes slideIn {
+@keyframes slideInUp {
   from {
-    transform: translateX(120%);
+    transform: translateY(100%);
     opacity: 0;
   }
   to {
-    transform: translateX(0);
+    transform: translateY(0);
     opacity: 1;
   }
 }
 
-@keyframes slideOut {
+@keyframes slideOutDown {
   from {
-    transform: translateX(0);
+    transform: translateY(0);
     opacity: 1;
   }
   to {
-    transform: translateX(120%);
+    transform: translateY(100%);
     opacity: 0;
   }
 }
@@ -205,10 +221,10 @@ onMounted(() => {
 /* 响应式设计 */
 @media (max-width: 640px) {
   .notification {
-    top: 16px;
+    bottom: 16px;
     right: 16px;
     left: 16px;
-    min-width: auto;
+    width: auto;
     max-width: none;
     border-radius: 8px;
   }
