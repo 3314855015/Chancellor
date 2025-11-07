@@ -1,6 +1,9 @@
 <template>
   <div v-if="visible" class="user-info-modal-overlay" @click="closeModal">
-    <div class="user-info-modal-content" @click.stop>
+    <!-- 加载动画 -->
+    <LoadingSpinner v-if="isLoggingOut" />
+    
+    <div v-if="!isLoggingOut" class="user-info-modal-content" @click.stop>
       <!-- 模态框头部 -->
       <div class="modal-header">
         <h3>用户信息</h3>
@@ -44,16 +47,19 @@
       <!-- 操作按钮 -->
       <div class="modal-actions">
         <button class="btn-back" @click="closeModal">返回</button>
-        <button class="btn-logout" @click="handleLogout">退出登录</button>
+        <button class="btn-logout" @click="handleLogout" :disabled="isLoggingOut">
+          {{ isLoggingOut ? '退出中...' : '退出登录' }}
+        </button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useAuthStore } from '@/stores/authStore'
 import { useRouter } from 'vue-router'
+import LoadingSpinner from '@/components/LoadingSpinner.vue'
 
 interface Props {
   visible: boolean
@@ -69,6 +75,7 @@ const emit = defineEmits<Emits>()
 
 const authStore = useAuthStore()
 const router = useRouter()
+const isLoggingOut = ref(false)
 
 const user = computed(() => authStore.user)
 
@@ -89,13 +96,21 @@ const closeModal = () => {
 }
 
 const handleLogout = async () => {
+  isLoggingOut.value = true
+  
   try {
+    // 等待数据清除完成
     await authStore.userLogout()
+    
+    // 确保数据完全清除后再进行跳转，延时2秒让用户看到加载动画
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    
     closeModal()
-    // 跳转到主页
-    router.push('/')
+    // 强制刷新页面，确保所有状态完全重置
+    window.location.href = '/'
   } catch (error) {
     console.error('退出登录失败:', error)
+    isLoggingOut.value = false
   }
 }
 </script>

@@ -216,8 +216,10 @@ const handleSwitchToLogin = () => {
 const handleLogout = async () => {
   try {
     await authStore.userLogout()
-    // 退出后刷新页面
-    window.location.reload()
+    // 确保数据完全清除后再进行跳转，延时2秒让用户看到加载动画
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    // 强制刷新页面，确保所有状态完全重置
+    window.location.href = '/'
   } catch (error) {
     console.error('退出登录失败:', error)
   }
