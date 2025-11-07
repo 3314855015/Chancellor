@@ -5,40 +5,16 @@
       subtitle="查看和管理所有生成的密钥"
     />
     
+    <!-- 通知组件 -->
+    <Notification 
+      v-model:visible="notification.visible"
+      :message="notification.message"
+      :type="notification.type"
+      :duration="notification.duration"
+      @close="hideNotification"
+    />
+    
     <main class="main-content">
-      <!-- 统计信息 -->
-      <section class="stats-section">
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-icon">🔑</div>
-            <div class="stat-content">
-              <div class="stat-value">{{ statistics.totalKeys }}</div>
-              <div class="stat-label">总密钥数</div>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon">✅</div>
-            <div class="stat-content">
-              <div class="stat-value">{{ statistics.usedKeys }}</div>
-              <div class="stat-label">已使用</div>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon">⏳</div>
-            <div class="stat-content">
-              <div class="stat-value">{{ statistics.unusedKeys }}</div>
-              <div class="stat-label">未使用</div>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon">📊</div>
-            <div class="stat-content">
-              <div class="stat-value">{{ statistics.expiredKeys }}</div>
-              <div class="stat-label">已过期</div>
-            </div>
-          </div>
-        </div>
-      </section>
 
       <!-- 密钥列表 -->
       <section class="keys-section">
@@ -46,6 +22,19 @@
           <h2 class="section-title">密钥列表</h2>
           <div class="section-actions">
             <Button label="刷新" @click="loadKeys" :loading="loading" />
+            <Button label="清理过期密钥" @click="manualCleanup" :loading="loading" />
+            <div class="auto-cleanup-toggle">
+              <label class="toggle-label">
+                <span class="toggle-text">定时清理(30min)</span>
+                <input 
+                  type="checkbox" 
+                  v-model="autoCleanupEnabled" 
+                  @change="toggleAutoCleanup"
+                  class="toggle-switch"
+                />
+                <span class="slider"></span>
+              </label>
+            </div>
             <Button label="返回主页" @click="goBack" />
           </div>
         </div>
@@ -157,15 +146,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import AdminNav from '@/components/Nav/AdminNav.vue'
 import Button from '@/components/Button.vue'
 import Footer from '@/components/Footer.vue'
+import Notification from '@/components/UI/Notification.vue'
+import { useNotification } from '@/composables/useNotification'
 import adminService from '@/services/adminService'
 import authService from '@/services/authService'
 
 const router = useRouter()
+const { 
+  showSuccess, 
+  showError, 
+  showInfo, 
+  showWarning, 
+  notification, 
+  hideNotification 
+} = useNotification()
 
 // 响应式数据 
 const keys = ref<any[]>([])
@@ -173,19 +172,14 @@ const loading = ref(false)
 const filterType = ref('')
 const filterStatus = ref('')
 const searchTerm = ref('')
+const autoCleanupEnabled = ref(false)
+const cleanupInterval = ref<NodeJS.Timeout | null>(null)
 
 const pagination = ref({
   page: 1,
-  pageSize: 20,
+  pageSize: 10, // 改为每页10条
   total: 0,
   totalPages: 0
-})
-
-const statistics = ref({
-  totalKeys: 0,
-  usedKeys: 0,
-  unusedKeys: 0,
-  expiredKeys: 0
 })
 
 // 获取当前用户ID
@@ -204,81 +198,58 @@ const loadKeys = async () => {
       throw new Error('用户未登录')
     }
 
+    // 构建过滤参数
+    const filters: {
+      keyType?: string;
+      status?: string;
+      searchTerm?: string;
+    } = {}
+    if (filterType.value) {
+      filters.keyType = filterType.value
+    }
+    if (filterStatus.value) {
+      filters.status = filterStatus.value
+    }
+    if (searchTerm.value) {
+      filters.searchTerm = searchTerm.value
+    }
+
     const response = await adminService.getKeysList(
       creatorId, 
       pagination.value.page, 
-      pagination.value.pageSize
+      pagination.value.pageSize,
+      filters
     )
     
     if (response.success && response.data) {
-      keys.value = response.data.keys
+      // 每次只保留当前页的数据
+      keys.value = response.data.keys || []
       pagination.value = {
         ...pagination.value,
-        total: response.data.pagination.total,
-        totalPages: response.data.pagination.totalPages
+        total: response.data.pagination?.total || 0,
+        totalPages: response.data.pagination?.totalPages || 0
       }
     } else {
       throw new Error(response.message)
     }
   } catch (error) {
     // 静默处理错误，不显示控制台日志
+    keys.value = []
+    pagination.value = {
+      ...pagination.value,
+      total: 0,
+      totalPages: 0
+    }
   } finally {
     loading.value = false
   }
 }
 
-// 加载统计信息
-const loadStatistics = async () => {
-  try {
-    const creatorId = getCurrentUserId()
-    
-    if (!creatorId) {
-      return
-    }
 
-    const response = await adminService.getKeyStatistics(creatorId)
-    
-    if (response.success && response.data) {
-      statistics.value = {
-        totalKeys: response.data.totalKeys,
-        usedKeys: response.data.usedKeys,
-        unusedKeys: response.data.unusedKeys,
-        expiredKeys: keys.value.filter(key => isExpired(key)).length
-      }
-    }
-  } catch (error) {
-    // 静默处理错误，不显示控制台日志
-  }
-}
 
-// 过滤后的密钥列表
+// 过滤后的密钥列表（直接使用服务器返回的数据，不进行客户端过滤）
 const filteredKeys = computed(() => {
-  return keys.value.filter(key => {
-    // 类型过滤
-    if (filterType.value && key.keyType !== filterType.value) {
-      return false
-    }
-    
-    // 状态过滤
-    if (filterStatus.value) {
-      const status = getKeyStatus(key)
-      if (filterStatus.value === 'unused' && status !== 'unused') return false
-      if (filterStatus.value === 'used' && status !== 'used') return false
-      if (filterStatus.value === 'expired' && status !== 'expired') return false
-    }
-    
-    // 搜索过滤
-    if (searchTerm.value) {
-      const term = searchTerm.value.toLowerCase()
-      return (
-        key.keyValue.toLowerCase().includes(term) ||
-        key.creatorName.toLowerCase().includes(term) ||
-        key.description?.toLowerCase().includes(term)
-      )
-    }
-    
-    return true
-  })
+  return keys.value
 })
 
 // 密钥状态判断
@@ -333,17 +304,17 @@ const deleteKey = async (keyId: number) => {
   // 先检查密钥状态，已使用或已过期的密钥不能删除
   const key = keys.value.find(k => k.id === keyId)
   if (!key) {
-    alert('未找到要删除的密钥')
+    showWarning('未找到要删除的密钥')
     return
   }
   
   if (key.used) {
-    alert('已使用的密钥不能删除')
+    showWarning('已使用的密钥不能删除')
     return
   }
   
   if (isExpired(key)) {
-    alert('已过期的密钥不能删除')
+    showWarning('已过期的密钥不能删除')
     return
   }
   
@@ -355,15 +326,14 @@ const deleteKey = async (keyId: number) => {
     const creatorId = getCurrentUserId()
     const response = await adminService.deleteKey(keyId, creatorId)
     
-    if (response.success) {
-      alert('密钥删除成功')
+      if (response.success) {
+      showSuccess('密钥删除成功')
       await loadKeys()
-      await loadStatistics()
     } else {
       throw new Error(response.message)
     }
   } catch (error) {
-    alert(error instanceof Error ? error.message : '删除密钥失败')
+    showError(error instanceof Error ? error.message : '删除密钥失败')
   }
 }
 
@@ -392,10 +362,105 @@ const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('zh-CN')
 }
 
+// 监听过滤条件变化，重置页码并重新加载数据
+watch([filterType, filterStatus, searchTerm], () => {
+  // 重置到第一页
+  pagination.value.page = 1
+  loadKeys()
+}, { deep: true })
+
+// 手动清理过期密钥
+const manualCleanup = async () => {
+  try {
+    const creatorId = getCurrentUserId()
+    if (!creatorId) {
+      showWarning('用户未登录')
+      return
+    }
+    
+    loading.value = true
+    const response = await adminService.cleanupExpiredKeys(creatorId)
+    
+    if (response.success) {
+      const deletedCount = response.data?.deletedCount || 0
+      if (deletedCount > 0) {
+        showSuccess(`清理完成，删除了 ${deletedCount} 个过期密钥`)
+      } else {
+        showInfo('没有发现需要清理的过期密钥')
+      }
+      await loadKeys()
+    } else {
+      throw new Error(response.message)
+    }
+  } catch (error) {
+    showError(error instanceof Error ? error.message : '清理失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 切换定时清理功能
+const toggleAutoCleanup = () => {
+  if (autoCleanupEnabled.value) {
+    // 启动定时清理
+    startAutoCleanup()
+    showInfo('定时清理已开启，每30分钟自动清理一次过期密钥')
+  } else {
+    // 停止定时清理
+    stopAutoCleanup()
+    showInfo('定时清理已关闭')
+  }
+}
+
+// 启动定时清理
+const startAutoCleanup = () => {
+  // 立即执行一次清理
+  performAutoCleanup()
+  
+  // 每30分钟执行一次清理
+  cleanupInterval.value = setInterval(() => {
+    performAutoCleanup()
+  }, 30 * 60 * 1000) // 30分钟
+}
+
+// 停止定时清理
+const stopAutoCleanup = () => {
+  if (cleanupInterval.value) {
+    clearInterval(cleanupInterval.value)
+    cleanupInterval.value = null
+  }
+}
+
+// 执行自动清理
+const performAutoCleanup = async () => {
+  try {
+    const creatorId = getCurrentUserId()
+    if (!creatorId) {
+      return
+    }
+    
+    const response = await adminService.cleanupExpiredKeys(creatorId)
+    if (response.success) {
+      const deletedCount = response.data?.deletedCount || 0
+      if (deletedCount > 0) {
+        showSuccess(`自动清理完成，删除了 ${deletedCount} 个过期密钥`)
+        // 如果当前页面正在显示，则刷新数据
+        await loadKeys()
+      }
+    }
+  } catch (error) {
+    showError('自动清理失败：' + (error instanceof Error ? error.message : '未知错误'))
+  }
+}
+
+// 组件卸载时清理定时器
+onUnmounted(() => {
+  stopAutoCleanup()
+})
+
 // 组件挂载时加载数据
 onMounted(async () => {
   await loadKeys()
-  await loadStatistics()
 })
 </script>
 
@@ -413,41 +478,7 @@ onMounted(async () => {
   padding: 20px;
 }
 
-/* 统计区域 */
-.stats-section {
-  margin-bottom: 30px;
-}
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 20px;
-}
-
-.stat-card {
-  display: flex;
-  align-items: center;
-  padding: 20px;
-  background: #f8f9fa;
-  border-radius: 12px;
-  border: 1px solid #e9ecef;
-}
-
-.stat-icon {
-  font-size: 2.5rem;
-  margin-right: 15px;
-}
-
-.stat-value {
-  font-size: 2rem;
-  font-weight: bold;
-  color: #2c3e50;
-}
-
-.stat-label {
-  color: #7f8c8d;
-  font-size: 0.9rem;
-}
 
 /* 密钥列表区域 */
 .keys-section {
@@ -474,6 +505,7 @@ onMounted(async () => {
 .section-actions {
   display: flex;
   gap: 10px;
+  align-items: center;
 }
 
 /* 过滤区域 */
@@ -594,6 +626,62 @@ tr.expired {
   margin-bottom: 15px;
 }
 
+/* 自动清理切换开关样式 */
+.auto-cleanup-toggle {
+  display: flex;
+  align-items: center;
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #495057;
+}
+
+.toggle-text {
+  font-weight: 500;
+}
+
+.toggle-switch {
+  display: none;
+}
+
+.slider {
+  position: relative;
+  width: 50px;
+  height: 24px;
+  background-color: #ccc;
+  border-radius: 24px;
+  transition: background-color 0.3s;
+}
+
+.slider:before {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  border-radius: 50%;
+  transition: transform 0.3s;
+}
+
+.toggle-switch:checked + .slider {
+  background-color: #4CAF50;
+}
+
+.toggle-switch:checked + .slider:before {
+  transform: translateX(26px);
+}
+
+.toggle-switch:focus + .slider {
+  box-shadow: 0 0 1px #4CAF50;
+}
+
 /* 分页 */
 .pagination {
   display: flex;
@@ -610,9 +698,6 @@ tr.expired {
 }
 
 @media (max-width: 768px) {
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
   
   .section-header {
     flex-direction: column;

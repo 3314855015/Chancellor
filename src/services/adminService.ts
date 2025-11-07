@@ -349,68 +349,38 @@ export const generateKeysBatch = async (
 }
 
 /**
- * 获取密钥列表（管理员功能）
+ * 获取密钥列表（管理员功能）- 使用RPC函数（支持服务器端过滤和搜索）
  */
-export const getKeysList = async (creatorId: string, page: number = 1, pageSize: number = 20): Promise<any> => {
+export const getKeysList = async (creatorId: string, page: number = 1, pageSize: number = 10, filters?: {
+  keyType?: string;
+  status?: string;
+  searchTerm?: string;
+}): Promise<any> => {
   try {
-    // 验证当前用户是否为管理员
-    const { data: currentUser, error: userError } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', creatorId)
-      .single()
-
-    if (userError || !currentUser) {
-      throw new Error('用户信息获取失败')
-    }
-
-    if (currentUser.role !== 'admin') {
-      throw new Error('只有管理员可以查看密钥列表')
-    }
-
-    const from = (page - 1) * pageSize
-    const to = from + pageSize - 1
-
-    const { data: keys, error, count } = await supabase
-      .from('invitation_keys')
-      .select(`
-        *,
-        creator:users!fk_invitation_keys_creator(username)
-      `, { count: 'exact' })
-      .order('created_at', { ascending: false })
-      .range(from, to)
+    // 使用RPC函数获取过滤后的密钥列表
+    const { data: result, error } = await supabase
+      .rpc('get_filtered_keys', {
+        p_admin_id: creatorId,
+        p_page: page,
+        p_page_size: pageSize,
+        p_key_type: filters?.keyType || null,
+        p_status_filter: filters?.status || null,
+        p_search_term: filters?.searchTerm || null
+      })
 
     if (error) {
       throw new Error(error.message)
     }
 
-    return {
-      success: true,
-      message: '获取密钥列表成功',
-      data: {
-        keys: keys?.map(key => ({
-          id: key.id,
-          keyValue: key.key_value,
-          keyType: key.key_type,
-          creatorId: key.creator_id,
-          creatorName: key.creator?.username || '未知',
-          used: key.used,
-          usedBy: key.used_by,
-          usedAt: key.used_at,
-          expiresAt: key.expires_at,
-          maxUses: key.max_uses,
-          currentUses: key.current_uses,
-          description: key.description,
-          createdAt: key.created_at,
-          updatedAt: key.updated_at
-        })) || [],
-        pagination: {
-          page,
-          pageSize,
-          total: count || 0,
-          totalPages: Math.ceil((count || 0) / pageSize)
-        }
+    // 解析RPC返回结果
+    if (result && result.success && result.data) {
+      return {
+        success: true,
+        message: '获取密钥列表成功',
+        data: result.data
       }
+    } else {
+      throw new Error(result?.message || '获取密钥列表失败')
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : '获取密钥列表失败'
@@ -431,37 +401,45 @@ export const getKeysList = async (creatorId: string, page: number = 1, pageSize:
 }
 
 /**
- * 删除密钥（管理员功能）
+ * 获取密钥统计信息（已不再使用，仅为兼容性保留）
+ */
+export const getKeyStatistics = async (creatorId: string): Promise<any> => {
+  return {
+    success: true,
+    message: '统计功能已移除',
+    data: {
+      totalKeys: 0,
+      usedKeys: 0,
+      unusedKeys: 0,
+      expiredKeys: 0
+    }
+  }
+}
+
+/**
+ * 删除密钥（管理员功能）- 使用RPC函数（安全版本）
  */
 export const deleteKey = async (keyId: number, creatorId: string): Promise<any> => {
   try {
-    // 验证当前用户是否为管理员
-    const { data: currentUser, error: userError } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', creatorId)
-      .single()
-
-    if (userError || !currentUser) {
-      throw new Error('用户信息获取失败')
-    }
-
-    if (currentUser.role !== 'admin') {
-      throw new Error('只有管理员可以删除密钥')
-    }
-
-    const { error } = await supabase
-      .from('invitation_keys')
-      .delete()
-      .eq('id', keyId)
+    // 使用RPC函数安全删除密钥
+    const { data: result, error } = await supabase
+      .rpc('delete_invitation_key_safe', {
+        p_key_id: keyId,
+        p_admin_id: creatorId
+      })
 
     if (error) {
       throw new Error(error.message)
     }
 
-    return {
-      success: true,
-      message: '密钥删除成功'
+    // 解析RPC返回结果
+    if (result && result.success) {
+      return {
+        success: true,
+        message: result.message || '密钥删除成功'
+      }
+    } else {
+      throw new Error(result?.message || '密钥删除失败')
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : '密钥删除失败'
@@ -473,77 +451,37 @@ export const deleteKey = async (keyId: number, creatorId: string): Promise<any> 
 }
 
 /**
- * 获取密钥统计信息（管理员功能）
+ * 清理过期未使用密钥（管理员功能）- 使用RPC函数
  */
-export const getKeyStatistics = async (creatorId: string): Promise<any> => {
+export const cleanupExpiredKeys = async (creatorId: string): Promise<any> => {
   try {
-    // 验证当前用户是否为管理员
-    const { data: currentUser, error: userError } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', creatorId)
-      .single()
+    // 使用RPC函数清理过期未使用密钥
+    const { data: result, error } = await supabase
+      .rpc('cleanup_expired_unused_keys', {
+        p_admin_id: creatorId
+      })
 
-    if (userError || !currentUser) {
-      throw new Error('用户信息获取失败')
+    if (error) {
+      throw new Error(error.message)
     }
 
-    if (currentUser.role !== 'admin') {
-      throw new Error('只有管理员可以查看统计信息')
-    }
-
-    // 获取所有密钥数据
-    const { data: allKeys, error: keysError } = await supabase
-      .from('invitation_keys')
-      .select('*')
-
-    if (keysError) {
-      throw new Error(keysError.message)
-    }
-
-    const totalKeys = allKeys?.length || 0
-    const usedKeys = allKeys?.filter(key => key.used).length || 0
-    const expiredKeys = allKeys?.filter(key => new Date(key.expires_at) < new Date()).length || 0
-
-    // 按类型统计
-    const statsByType = allKeys?.reduce((acc: any, item) => {
-      const type = item.key_type
-      if (!acc[type]) {
-        acc[type] = { total: 0, used: 0, expired: 0 }
+    // 解析RPC返回结果
+    if (result && result.success) {
+      return {
+        success: true,
+        message: result.message || '清理完成',
+        data: {
+          deletedCount: result.deleted_count || 0
+        }
       }
-      acc[type].total++
-      if (item.used) {
-        acc[type].used++
-      }
-      if (new Date(item.expires_at) < new Date()) {
-        acc[type].expired++
-      }
-      return acc
-    }, {}) || {}
-
-    return {
-      success: true,
-      message: '获取统计信息成功',
-      data: {
-        totalKeys,
-        usedKeys,
-        unusedKeys: totalKeys - usedKeys,
-        expiredKeys,
-        statsByType
-      }
+    } else {
+      throw new Error(result?.message || '清理失败')
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : '获取统计信息失败'
+    const message = error instanceof Error ? error.message : '清理过期密钥失败'
     return {
       success: false,
-      message,
-      data: {
-        totalKeys: 0,
-        usedKeys: 0,
-        unusedKeys: 0,
-        expiredKeys: 0,
-        statsByType: {}
-      }
+      message
     }
   }
 }
@@ -734,5 +672,6 @@ export default {
   getKeyStatistics,
   getUsersList,
   updateUser,
-  suspendUser
+  suspendUser,
+  cleanupExpiredKeys
 }
