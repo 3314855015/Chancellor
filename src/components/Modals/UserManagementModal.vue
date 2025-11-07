@@ -1,11 +1,12 @@
 <template>
-  <BaseModal
-    v-model:visible="visible"
-    title="👥 用户管理"
-    size="large"
-    width="1200px"
-    @close="$emit('close')"
-  >
+  <div v-if="visible" class="modal-overlay" @click.self="$emit('close')">
+    <div class="modal-container" @click.stop>
+      <div class="modal-header">
+        <h2 class="modal-title">👥 用户管理</h2>
+        <button class="close-btn" @click="$emit('close')">×</button>
+      </div>
+      
+      <div class="modal-content">
     <!-- 筛选区域 -->
     <div class="filter-section">
       <div class="filter-row">
@@ -157,15 +158,17 @@
       {{ message.text }}
     </div>
 
-    <template #footer>
-      <Button label="关闭" @click="$emit('close')" />
-    </template>
-  </BaseModal>
+      </div>
+      
+      <div class="modal-footer">
+        <Button label="关闭" @click="$emit('close')" />
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
-import BaseModal from './BaseModal.vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import Button from '@/components/Button.vue'
 import adminService from '@/services/adminService'
 import authService from '@/services/authService'
@@ -217,11 +220,27 @@ const totalPages = ref(1)
 // 计算属性 - 直接使用从API获取的分页数据
 const paginatedUsers = computed(() => users.value)
 
+// 控制body滚动
+const disableBodyScroll = () => {
+  document.body.style.overflow = 'hidden'
+  document.body.style.position = 'fixed'
+  document.body.style.width = '100%'
+}
+
+const enableBodyScroll = () => {
+  document.body.style.overflow = ''
+  document.body.style.position = ''
+  document.body.style.width = ''
+}
+
 // 监听visible变化
 watch(() => props.visible, (newVal) => {
   visible.value = newVal
   if (newVal) {
+    disableBodyScroll()
     loadUsers()
+  } else {
+    enableBodyScroll()
   }
 })
 
@@ -373,47 +392,206 @@ const showMessage = (type: 'success' | 'error', text: string) => {
   }, 3000)
 }
 
+// 组件卸载时清理
+onUnmounted(() => {
+  enableBodyScroll()
+})
+
 // 初始化
 onMounted(() => {
   if (visible.value) {
+    disableBodyScroll()
     loadUsers()
   }
 })
 </script>
 
 <style scoped>
-.filter-section {
-  margin-bottom: 20px;
-  padding: 15px;
+/* 模态框遮罩层 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* 模态框容器 */
+.modal-container {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  width: 1200px;
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: slideIn 0.3s ease-out;
+  transform: translateY(0);
+  transition: all 0.3s ease;
+}
+
+.modal-container:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.35);
+}
+
+/* 模态框头部 */
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 32px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  position: relative;
+}
+
+.modal-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+}
+
+.modal-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.close-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
+}
+
+/* 模态框内容区域 */
+.modal-content {
+  padding: 32px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* 模态框底部 */
+.modal-footer {
+  padding: 20px 32px;
   background: #f8f9fa;
-  border-radius: 8px;
+  border-top: 1px solid #e9ecef;
+  text-align: right;
+}
+
+/* 动画定义 */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { 
+    opacity: 0; 
+    transform: translateY(-30px) scale(0.95);
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 筛选区域美化 */
+.filter-section {
+  margin-bottom: 24px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.filter-section:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
 
 .filter-row {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 24px;
   flex-wrap: wrap;
 }
 
 .filter-group {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  transition: all 0.3s ease;
+}
+
+.filter-group:hover {
+  transform: translateX(2px);
 }
 
 .filter-label {
-  font-weight: 500;
+  font-weight: 600;
   color: #2c3e50;
   white-space: nowrap;
+  font-size: 0.95rem;
+  text-shadow: 0 1px 2px rgba(255,255,255,0.8);
 }
 
 .filter-select {
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background: white;
-  min-width: 120px;
+  padding: 10px 16px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  min-width: 140px;
+  font-size: 0.9rem;
+  color: #2c3e50;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  position: relative;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+  transform: translateY(-1px);
+}
+
+.filter-select:hover {
+  border-color: #e9ecef;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .user-table-container {
@@ -425,27 +603,58 @@ onMounted(() => {
   width: 100%;
   border-collapse: collapse;
   background: white;
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.user-table:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
 }
 
 .user-table th {
-  background: #f8f9fa;
-  padding: 12px 15px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 16px 20px;
   text-align: left;
   font-weight: 600;
-  color: #2c3e50;
-  border-bottom: 1px solid #e9ecef;
+  color: white;
+  border-bottom: none;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  position: relative;
+}
+
+.user-table th::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
 }
 
 .user-table td {
-  padding: 12px 15px;
-  border-bottom: 1px solid #e9ecef;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(233, 236, 239, 0.8);
+  transition: all 0.3s ease;
+  position: relative;
 }
 
 .user-row:hover {
-  background: #f8f9fa;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.user-row:hover td {
+  border-color: rgba(102, 126, 234, 0.3);
 }
 
 .empty-row {
@@ -457,17 +666,37 @@ onMounted(() => {
 }
 
 .editable-select {
-  padding: 4px 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background: white;
-  min-width: 100px;
+  padding: 8px 12px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  min-width: 120px;
+  font-size: 0.9rem;
+  color: #2c3e50;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.editable-select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+  transform: translateY(-1px);
+}
+
+.editable-select:hover {
+  border-color: #e9ecef;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .editable-select:disabled {
-  background: #f8f9fa;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
   color: #6c757d;
   cursor: not-allowed;
+  border-color: transparent;
+  box-shadow: none;
 }
 
 .not-applicable {
@@ -505,11 +734,20 @@ onMounted(() => {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 20px;
-  margin: 20px 0;
-  padding: 15px;
-  background: #f8f9fa;
-  border-radius: 8px;
+  gap: 24px;
+  margin: 24px 0;
+  padding: 20px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.pagination-controls:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
 }
 
 .page-info {
