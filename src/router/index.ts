@@ -36,6 +36,14 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/security',
+    name: 'AdminSecurity',
+    component: () => import('@/views/AdminSecuritySettings.vue'),
+    meta: {
+      title: '安全设置'
+    }
+  },
+  {
     path: '/examiner',
     name: 'Examiner',
     component: () => import('@/views/ExaminerPage.vue'),
