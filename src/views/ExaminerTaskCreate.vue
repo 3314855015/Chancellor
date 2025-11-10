@@ -191,6 +191,8 @@ import ExaminerNav from '@/components/Nav/ExaminerNav.vue'
 import Button from '@/components/Button.vue'
 import Footer from '@/components/Footer.vue'
 import examinerService from '@/services/examinerService'
+import { getApiEndpoint } from '@/config/env'
+
 
 const router = useRouter()
 
@@ -305,8 +307,11 @@ const generateAITask = async () => {
       throw new Error('请输入任务需求描述以生成更准确的AI任务')
     }
     
+    // 获取AI任务生成服务的API端点
+    const aiTaskCreateUrl = getApiEndpoint('AI_TASK_CREATE')
+    
     // 调用n8n AI任务生成API
-    const response = await fetch('http://localhost:5678/webhook-test/ai-create', {
+    const response = await fetch(aiTaskCreateUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

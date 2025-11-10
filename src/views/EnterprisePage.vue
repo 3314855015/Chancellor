@@ -160,6 +160,7 @@ import StudentAbilityModal from '@/components/Modals/StudentAbilityModal.vue'
 import StudentTaskHistoryModal from '@/components/Modals/StudentTaskHistoryModal.vue'
 import UserInfoModal from '@/components/Modals/UserInfoModal.vue'
 import enterpriseService from '@/services/enterpriseService'
+import { getApiEndpoint } from '@/config/env'
 
 
 
@@ -412,12 +413,11 @@ const fetchAIRecommendations = async () => {
   // 开始加载
   isLoading.value = true
 
-  // 发送请求到AI推荐服务 
-  //http://localhost:5678/webhook/ai-recommendation
-  //http://localhost:5678/webhook-test/ai-recommendation
-  //https://yjw123456.app.n8n.cloud/webhook/ai-recommendation
+  // 获取AI推荐服务的API端点
+  const aiRecommendationUrl = getApiEndpoint('AI_RECOMMENDATION')
+  
   try {
-    const response = await fetch('http://localhost:5678/webhook/ai-recommendation', {
+    const response = await fetch(aiRecommendationUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
