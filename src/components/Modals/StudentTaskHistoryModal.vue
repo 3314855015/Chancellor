@@ -2,7 +2,7 @@
   <div class="modal-overlay" @click="closeModal">
     <div class="modal-content" @click.stop>
       <div class="modal-header">
-        <h3>📋 学生任务历史</h3>
+        <h3>📋 学生最新任务</h3>
         <button class="close-button" @click="closeModal">×</button>
       </div>
       
@@ -22,60 +22,56 @@
           </div>
         </div>
 
-        <!-- 任务历史 -->
+        <!-- 最新任务 -->
         <div class="task-history-section">
-          <h4>任务记录</h4>
+          <h4>最新完成的任务</h4>
           
-          <div v-if="taskHistory && taskHistory.length > 0" class="task-list">
-            <div 
-              v-for="task in taskHistory" 
-              :key="task.assignment.id"
-              class="task-item"
-            >
+          <div v-if="latestTask" class="latest-task">
+            <div class="task-item">
               <div class="task-header">
-                <h5 class="task-title">{{ task.task.title }}</h5>
-                <span class="task-status" :class="getStatusClass(task.assignment.status)">
-                  {{ getStatusText(task.assignment.status) }}
+                <h5 class="task-title">{{ latestTask.task_title }}</h5>
+                <span class="task-status status-completed">
+                  已完成
                 </span>
               </div>
               
               <div class="task-details">
                 <div class="task-info">
-                  <span class="task-publisher">发布者: {{ task.task.publisher }}</span>
-                  <span class="task-reward">奖励: {{ task.task.reward }}点</span>
-                  <span class="task-deadline">截止: {{ formatDate(task.task.deadline) }}</span>
+                  <span class="task-publisher">发布者: {{ latestTask.examiner_username }}</span>
+                  <span class="task-reward">奖励: {{ latestTask.reward_points }}点</span>
+                  <span class="task-ability">能力类型: {{ getAbilityText(latestTask.ability_type) }}</span>
                 </div>
                 
-                <div v-if="task.assignment.awardedPoints" class="awarded-points">
+                <div v-if="latestTask.submission_date" class="submission-info">
+                  <span class="submission-date">提交时间: {{ formatDate(latestTask.submission_date) }}</span>
+                </div>
+                
+                <div v-if="latestTask.completion_date" class="review-info">
+                  <span class="review-date">完成时间: {{ formatDate(latestTask.completion_date) }}</span>
+                </div>
+                
+                <div v-if="latestTask.awarded_points" class="awarded-points">
                   <span class="points-label">获得点数:</span>
-                  <span class="points-value">{{ task.assignment.awardedPoints }}点</span>
-                </div>
-                
-                <div v-if="task.assignment.submittedAt" class="submission-info">
-                  <span class="submission-date">提交时间: {{ formatDate(task.assignment.submittedAt) }}</span>
-                </div>
-                
-                <div v-if="task.assignment.reviewedAt" class="review-info">
-                  <span class="review-date">审核时间: {{ formatDate(task.assignment.reviewedAt) }}</span>
+                  <span class="points-value">{{ latestTask.awarded_points }}点</span>
                 </div>
               </div>
               
-              <div v-if="task.assignment.submission" class="task-submission">
-                <p class="submission-label">提交内容:</p>
-                <p class="submission-content">{{ task.assignment.submission }}</p>
+              <div v-if="latestTask.task_description" class="task-description">
+                <p class="description-label">任务描述:</p>
+                <p class="description-content">{{ latestTask.task_description }}</p>
               </div>
             </div>
           </div>
           
           <div v-else class="no-tasks">
-            <p>该学生暂无任务记录</p>
+            <p>该学生暂无已完成任务记录</p>
           </div>
         </div>
 
         <!-- 加载状态 -->
         <div v-if="loading" class="loading-section">
           <LoadingSpinner />
-          <p>正在加载任务历史...</p>
+          <p>正在加载任务信息...</p>
         </div>
 
         <!-- 错误状态 -->
@@ -95,8 +91,9 @@
 import { ref, onMounted } from 'vue'
 import Button from '@/components/Button.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import { supabase } from '@/lib/supabase.client'
 import enterpriseService from '@/services/enterpriseService'
-import type { StudentInfo, StudentTaskHistory } from '@/services/enterpriseService'
+import type { StudentInfo } from '@/services/enterpriseService'
 
 interface Props {
   studentId: string
@@ -106,11 +103,25 @@ interface Emits {
   (e: 'close'): void
 }
 
+interface LatestTask {
+  task_id: string
+  task_title: string
+  task_description: string
+  examiner_username: string
+  examiner_email: string
+  ability_type: string
+  reward_points: number
+  submission_date: string
+  completion_date: string
+  awarded_points: number
+  task_status: string
+}
+
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
 const studentInfo = ref<StudentInfo | null>(null)
-const taskHistory = ref<StudentTaskHistory[] | null>(null)
+const latestTask = ref<LatestTask | null>(null)
 const loading = ref(true)
 const error = ref<string>('')
 
@@ -123,23 +134,45 @@ const loadStudentData = async () => {
     loading.value = true
     error.value = ''
 
-    // 并行加载学生信息和任务历史
-    const [infoResult, historyResult] = await Promise.all([
+    // 并行加载学生信息和最新任务
+    const [infoResult, latestTaskResult] = await Promise.all([
       enterpriseService.getStudentInfo(props.studentId),
-      enterpriseService.getStudentTaskHistory(props.studentId)
+      getStudentLatestTask(props.studentId)
     ])
 
     studentInfo.value = infoResult
-    taskHistory.value = historyResult
+    
+    if (latestTaskResult.success && latestTaskResult.data?.latest_task) {
+      latestTask.value = latestTaskResult.data.latest_task
+    }
 
     if (!infoResult) {
       error.value = '未找到学生信息'
     }
   } catch (err) {
     console.error('加载学生数据失败:', err)
-    error.value = '加载任务历史失败，请稍后重试'
+    error.value = '加载任务信息失败，请稍后重试'
   } finally {
     loading.value = false
+  }
+}
+
+const getStudentLatestTask = async (studentId: string) => {
+  try {
+    const { data, error } = await supabase.rpc('get_enterprise_student_latest_task', {
+      p_student_id: studentId
+    })
+
+    if (error) {
+      console.error('调用RPC函数失败:', error)
+      return { success: false, data: null }
+    }
+
+    // RPC函数返回的是完整的JSON对象，需要直接返回
+    return data
+  } catch (err) {
+    console.error('获取学生最新任务异常:', err)
+    return { success: false, data: null }
   }
 }
 
@@ -153,25 +186,21 @@ const getStatusText = (status: string | null) => {
   switch (status.toLowerCase()) {
     case 'wild': return '在野'
     case 'selected': return '中举'
-    case 'assigned': return '已分配'
-    case 'submitted': return '已提交'
-    case 'completed': return '已完成'
-    case 'reviewed': return '已审核'
     default: return status
   }
 }
 
-const getStatusClass = (status: string) => {
-  switch (status?.toLowerCase()) {
-    case 'completed':
-    case 'reviewed':
-      return 'status-completed'
-    case 'submitted':
-      return 'status-submitted'
-    case 'assigned':
-      return 'status-assigned'
-    default:
-      return 'status-default'
+const getAbilityText = (abilityType: string) => {
+  switch (abilityType?.toLowerCase()) {
+    case 'frontend': return '前端开发'
+    case 'android': return '安卓开发'
+    case 'backend': return '后端开发'
+    case 'ai': return '人工智能'
+    case 'communication': return '沟通能力'
+    case 'creativity': return '创造力'
+    case 'leadership': return '领导力'
+    case 'general': return '通用能力'
+    default: return abilityType || '通用能力'
   }
 }
 
@@ -292,11 +321,9 @@ const formatDate = (dateString: string | null) => {
   font-size: 1.1rem;
 }
 
-.task-list {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
+        .latest-task {
+          display: block;
+        }
 
 .task-item {
   border: 1px solid #e0e0e0;
@@ -359,64 +386,73 @@ const formatDate = (dateString: string | null) => {
   margin-bottom: 15px;
 }
 
-.task-info {
-  display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
-}
+        .task-info {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          margin-bottom: 15px;
+        }
 
-.task-publisher,
-.task-reward,
-.task-deadline {
-  color: #7f8c8d;
-  font-size: 0.9rem;
-}
+        .task-publisher,
+        .task-reward,
+        .task-ability {
+          color: #7f8c8d;
+          font-size: 0.9rem;
+        }
 
-.awarded-points {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+        .task-ability {
+          color: #3498db;
+          font-weight: 600;
+        }
 
-.points-label {
-  color: #7f8c8d;
-  font-size: 0.9rem;
-}
+        .awarded-points {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 10px;
+        }
 
-.points-value {
-  color: #f57c00;
-  font-weight: 600;
-  font-size: 1rem;
-}
+        .points-label {
+          color: #7f8c8d;
+          font-size: 0.9rem;
+        }
 
-.submission-info,
-.review-info {
-  color: #7f8c8d;
-  font-size: 0.9rem;
-}
+        .points-value {
+          color: #f57c00;
+          font-weight: 600;
+          font-size: 1rem;
+        }
 
-.task-submission {
-  border-top: 1px solid #f0f0f0;
-  padding-top: 15px;
-}
+        .submission-info,
+        .review-info {
+          color: #7f8c8d;
+          font-size: 0.9rem;
+          margin-bottom: 8px;
+        }
 
-.submission-label {
-  margin: 0 0 8px 0;
-  color: #7f8c8d;
-  font-size: 0.9rem;
-  font-weight: 600;
-}
+        .task-description {
+          border-top: 1px solid #f0f0f0;
+          padding-top: 15px;
+          margin-top: 15px;
+        }
 
-.submission-content {
-  margin: 0;
-  color: #5a6c7d;
-  font-size: 0.9rem;
-  line-height: 1.4;
-  background: #f8f9fa;
-  padding: 10px;
-  border-radius: 4px;
-  border-left: 3px solid #87CEEB;
-}
+        .description-label {
+          margin: 0 0 8px 0;
+          color: #7f8c8d;
+          font-size: 0.9rem;
+          font-weight: 600;
+        }
+
+        .description-content {
+          margin: 0;
+          color: #5a6c7d;
+          font-size: 0.9rem;
+          line-height: 1.4;
+          background: #f8f9fa;
+          padding: 10px;
+          border-radius: 4px;
+          border-left: 3px solid #87CEEB;
+        }
 
 .no-tasks {
   text-align: center;
