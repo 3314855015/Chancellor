@@ -39,6 +39,8 @@ interface AbilityInfo {
   name: string
   value: number
   icon: string
+  totalValue?: number
+  tempValue?: number
 }
 
 interface EmploymentOpportunity {
@@ -1209,6 +1211,226 @@ const getDefaultAbilities = (): AbilityInfo[] => {
 }
 
 /**
+ * 获取学生实际能力数据（包含基础值和临时值）
+ */
+export const getStudentActualAbilities = async (): Promise<{
+  success: boolean
+  message: string
+  data: {
+    abilities: AbilityInfo[]
+    remainingBasePoints: number
+    remainingPoints: number
+    remainingTotalPoints: number
+    generalPoints: number
+  }
+}> => {
+  try {
+    const currentUser = authService.getCurrentUser()
+    if (!currentUser) {
+      return {
+        success: false,
+        message: '用户未登录',
+        data: { abilities: [], remainingBasePoints: 0, remainingPoints: 0, remainingTotalPoints: 0, generalPoints: 0 }
+      }
+    }
+
+    // 使用RPC函数获取学生实际能力数据（包含基础值和临时值）
+    const response = await supabase.rpc('get_student_actual_abilities', { p_user_id: currentUser.id });
+    
+    // 使用新的RPC函数获取有效的general点数
+    const abilityRecordsResponse = await supabase.rpc('get_ability_records', { p_user_id: currentUser.id });
+    
+    const { data, error } = response;
+    const { data: abilityRecordsData, error: abilityRecordsError } = abilityRecordsResponse;
+    
+    if (error) {
+      console.warn('获取学生实际能力数据失败:', error)
+      // 回退到旧方法，并包装返回类型
+      const result = await getStudentAbilities()
+      return {
+        ...result,
+        data: {
+          ...result.data,
+          remainingBasePoints: 0,
+          remainingPoints: 0,
+          remainingTotalPoints: 0,
+          generalPoints: 0
+        }
+      }
+    }
+    
+    if (data) {
+      // RPC函数返回的是嵌套的数据结构      
+      // 解析嵌套结构 - 检查不同的返回格式
+      let rpcData = null
+      
+      // 解析 Supabase RPC 返回的双层嵌套结构
+      // Supabase RPC 返回格式: {data: {success: true, data: {...}}, error: null}
+      if (data.success !== undefined && data.data) {
+        // 格式1: 双层嵌套结构 - data.data 包含实际数据
+        rpcData = data.data
+      } else if (data.base_abilities || data.general_points !== undefined) {
+        // 格式2: 直接包含数据字段
+        rpcData = data
+      } else if (data.data) {
+        // 格式3: 单层嵌套结构
+        rpcData = data.data
+      } else {
+        // 格式4: 其他格式，尝试直接使用
+        rpcData = data
+      }
+      
+      if (!rpcData) {
+        console.warn('RPC返回数据格式不正确，使用默认值')
+        // 回退到旧方法
+        const result = await getStudentAbilities()
+        return {
+          ...result,
+          data: {
+            ...result.data,
+            remainingBasePoints: 0,
+            remainingPoints: 0,
+            remainingTotalPoints: 0,
+            generalPoints: 0
+          }
+        }
+      }
+      
+      // 解析ability records数据获取有效的general点数
+      let actualGeneralPoints = rpcData.general_points || 0;
+      if (abilityRecordsData && abilityRecordsData.success && abilityRecordsData.data) {
+        // 使用新的RPC函数返回的general点数
+        actualGeneralPoints = abilityRecordsData.data.general_points || 0;
+        console.log('使用新的RPC函数获取的general点数:', actualGeneralPoints);
+      } else if (abilityRecordsError) {
+        console.warn('获取ability records失败，使用默认值:', abilityRecordsError);
+      }
+      
+      // 将对象格式转换为前端需要的数组格式，合并基础值和临时值
+      const abilitiesArray = [
+        {
+          name: '前端开发',
+          value: rpcData.base_abilities?.frontend_points || 0,
+          tempValue: rpcData.temp_abilities?.frontend_points || 0,
+          totalValue: (rpcData.base_abilities?.frontend_points || 0) + (rpcData.temp_abilities?.frontend_points || 0),
+          icon: '💻'
+        },
+        {
+          name: '安卓开发',
+          value: rpcData.base_abilities?.android_points || 0,
+          tempValue: rpcData.temp_abilities?.android_points || 0,
+          totalValue: (rpcData.base_abilities?.android_points || 0) + (rpcData.temp_abilities?.android_points || 0),
+          icon: '📱'
+        },
+        {
+          name: '后端开发',
+          value: rpcData.base_abilities?.backend_points || 0,
+          tempValue: rpcData.temp_abilities?.backend_points || 0,
+          totalValue: (rpcData.base_abilities?.backend_points || 0) + (rpcData.temp_abilities?.backend_points || 0),
+          icon: '⚙️'
+        },
+        {
+          name: '人工智能',
+          value: rpcData.base_abilities?.ai_points || 0,
+          tempValue: rpcData.temp_abilities?.ai_points || 0,
+          totalValue: (rpcData.base_abilities?.ai_points || 0) + (rpcData.temp_abilities?.ai_points || 0),
+          icon: '🤖'
+        },
+        {
+          name: '沟通能力',
+          value: rpcData.base_abilities?.communication_points || 0,
+          tempValue: rpcData.temp_abilities?.communication_points || 0,
+          totalValue: (rpcData.base_abilities?.communication_points || 0) + (rpcData.temp_abilities?.communication_points || 0),
+          icon: '💬'
+        },
+        {
+          name: '创造力',
+          value: rpcData.base_abilities?.creativity_points || 0,
+          tempValue: rpcData.temp_abilities?.creativity_points || 0,
+          totalValue: (rpcData.base_abilities?.creativity_points || 0) + (rpcData.temp_abilities?.creativity_points || 0),
+          icon: '💡'
+        },
+        {
+          name: '领导力',
+          value: rpcData.base_abilities?.leadership_points || 0,
+          tempValue: rpcData.temp_abilities?.leadership_points || 0,
+          totalValue: (rpcData.base_abilities?.leadership_points || 0) + (rpcData.temp_abilities?.leadership_points || 0),
+          icon: '👑'
+        }
+      ]
+      
+      // 重新计算剩余点数，使用实际的general点数
+      const baseTotal = (rpcData.base_abilities?.frontend_points || 0) +
+                       (rpcData.base_abilities?.android_points || 0) +
+                       (rpcData.base_abilities?.backend_points || 0) +
+                       (rpcData.base_abilities?.ai_points || 0) +
+                       (rpcData.base_abilities?.communication_points || 0) +
+                       (rpcData.base_abilities?.creativity_points || 0) +
+                       (rpcData.base_abilities?.leadership_points || 0);
+      
+      const tempTotal = (rpcData.temp_abilities?.frontend_points || 0) +
+                        (rpcData.temp_abilities?.android_points || 0) +
+                        (rpcData.temp_abilities?.backend_points || 0) +
+                        (rpcData.temp_abilities?.ai_points || 0) +
+                        (rpcData.temp_abilities?.communication_points || 0) +
+                        (rpcData.temp_abilities?.creativity_points || 0) +
+                        (rpcData.temp_abilities?.leadership_points || 0);
+      
+      const remainingBasePoints = Math.max(0, 10 - baseTotal);
+      const remainingTotalPoints = Math.max(0, 10 + actualGeneralPoints - (baseTotal + tempTotal));
+      
+      console.log('修正后的剩余点数计算:', {
+        baseTotal,
+        tempTotal,
+        actualGeneralPoints,
+        remainingBasePoints,
+        remainingTotalPoints
+      })
+      
+      return {
+        success: true,
+        message: '获取学生能力数据成功',
+        data: { 
+          abilities: abilitiesArray,
+          remainingBasePoints: remainingBasePoints,
+          remainingPoints: remainingTotalPoints,
+          remainingTotalPoints: remainingTotalPoints,
+          generalPoints: actualGeneralPoints
+        }
+      }
+    } else {
+      console.warn('获取学生能力数据失败: RPC返回空数据')
+      // 回退到旧方法，并包装返回类型
+      const result = await getStudentAbilities()
+      return {
+        ...result,
+        data: {
+          ...result.data,
+          remainingBasePoints: 0,
+          remainingPoints: 0,
+          remainingTotalPoints: 0,
+          generalPoints: 0
+        }
+      }
+    }
+  } catch (error) {
+    console.error('获取学生实际能力数据失败:', error)
+    // 回退到旧方法，并包装返回类型
+    const result = await getStudentAbilities()
+    return {
+      ...result,
+      data: {
+        ...result.data,
+        remainingBasePoints: 0,
+        remainingPoints: 0,
+        remainingTotalPoints: 0,
+        generalPoints: 0
+      }
+    }
+  }
+}
+
+/**
  * 使用自定义认证方式获取任务列表
  */
 const getStudentTasksWithCustomAuth = async (currentUser: any, status?: 'available' | 'accepted' | 'completed'): Promise<{
@@ -1275,6 +1497,7 @@ export default {
   getStudentInfo,
   getStudentTeacher,
   getStudentAbilities,
+  getStudentActualAbilities,
   getStudentTasks,
   acceptTask,
   submitTask,

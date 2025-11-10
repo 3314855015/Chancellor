@@ -17,6 +17,8 @@ export interface AbilityInfo {
   name: string
   value: number
   icon: string
+  totalValue?: number
+  tempValue?: number
 }
 
 export interface TaskInfo {

@@ -11,6 +11,8 @@ interface AbilityInfo {
   name: string
   value: number
   icon: string
+  totalValue?: number
+  tempValue?: number
 }
 
 // 定义类型接口
