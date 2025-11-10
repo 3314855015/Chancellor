@@ -146,12 +146,16 @@
                         class="battery-cell"
                         :class="{ 
                           'active': i <= ability.value, 
+                          'temp': i > ability.value && i <= (ability.totalValue || ability.value),
                           'editable': !studentTeacher && !isUpdatingAbility
                         }"
                         @click="updateAbilityValue(index, i)"
                       ></div>
                     </div>
-                    <span class="ability-score">{{ ability.value }}/10</span>
+                    <span class="ability-score">
+                      {{ ability.totalValue || ability.value }}/10
+                      <span v-if="ability.tempValue > 0" class="temp-hint">({{ ability.value }} + {{ ability.tempValue }}临时)</span>
+                    </span>
                   </div>
                 </div>
               </div>
@@ -688,9 +692,17 @@ const loadStudentTeacher = async () => {
 // 加载能力数据
 const loadStudentAbilities = async () => {
   try {
-    const response = await studentService.getStudentAbilities()
+    // 使用新的RPC函数获取学生实际能力数据（包含基础值和临时值）
+    const response = await studentService.getStudentActualAbilities()
     if (response.success) {
       abilities.value = response.data.abilities
+      
+      // 更新学生总能力点数 - 使用总值（基础值+临时值）
+      const totalPoints = abilities.value.reduce((sum, ability) => {
+        const totalValue = ability.totalValue || (ability.value + (ability.tempValue || 0))
+        return sum + totalValue
+      }, 0)
+      studentInfo.value.abilityPoints = totalPoints
     }
   } catch (error) {
     console.error('加载能力数据失败:', error)
@@ -1271,6 +1283,12 @@ onMounted(async () => {
   box-shadow: 0 1px 2px rgba(135, 206, 235, 0.3);
 }
 
+.battery-cell.temp {
+  background: linear-gradient(135deg, #ffc107 0%, #ffd54f 100%);
+  border-color: #ffa000;
+  box-shadow: 0 1px 2px rgba(255, 193, 7, 0.3);
+}
+
 .battery-cell.editable:hover {
   transform: scale(1.05);
   border-color: #87CEEB;
@@ -1286,6 +1304,12 @@ onMounted(async () => {
   font-weight: bold;
   min-width: 40px;
   text-align: right;
+}
+
+.temp-hint {
+  font-size: 0.7rem;
+  color: #ffa000;
+  font-weight: normal;
 }
 
 /* 教师绑定提示样式 */
