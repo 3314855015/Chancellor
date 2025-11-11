@@ -36,7 +36,7 @@
               id="register-password"
               v-model="formData.password"
               type="password"
-              placeholder="请输入密码（至少8位）"
+              placeholder="请输入密码"
               class="form-input"
             />
           </div>
@@ -73,6 +73,7 @@
 import { ref, watch } from 'vue'
 import { useNotification } from '@/composables/useNotification'
 import { useAuthStore } from '@/stores/authStore'
+import securityService from '@/services/securityService'
 
 interface Props {
   visible: boolean
@@ -130,7 +131,7 @@ const handleSwitchToLogin = () => {
   handleClose()
 }
 
-const validateForm = () => {
+const validateForm = async () => {
   // 检查必填字段
   if (!formData.value.username.trim()) {
     showError('请输入用户名')
@@ -164,9 +165,22 @@ const validateForm = () => {
     return false
   }
   
-  if (formData.value.password.length < 8) {
-    showError('密码长度至少为8位')
-    return false
+  // 动态获取最小密码长度
+  try {
+    const passwordPolicy = await securityService.getPasswordPolicy()
+    const minPasswordLength = passwordPolicy.minLength
+    
+    if (formData.value.password.length < minPasswordLength) {
+      showError(`密码长度至少为${minPasswordLength}位`)
+      return false
+    }
+  } catch (error) {
+    console.error('获取密码策略失败，使用默认值:', error)
+    // 如果获取失败，使用默认值8位
+    if (formData.value.password.length < 8) {
+      showError('密码长度至少为8位')
+      return false
+    }
   }
   
   if (!formData.value.agreeTerms) {
@@ -178,7 +192,8 @@ const validateForm = () => {
 }
 
 const handleSubmit = async () => {
-  if (!validateForm()) return
+  const isValid = await validateForm()
+  if (!isValid) return
   
   loading.value = true
   

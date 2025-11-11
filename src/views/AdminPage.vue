@@ -68,6 +68,8 @@
         </div>
       </section>
 
+
+
       <!-- 系统管理 -->
       <section class="section">
         <h2 class="section-title">⚙️ 系统管理</h2>
@@ -96,12 +98,34 @@
           
           <Card class="manage-card" hoverable>
             <template #header>
-              <div class="card-icon">📊</div>
-              <h3>数据统计</h3>
+              <div class="card-icon">📝</div>
+              <h3>任务管理</h3>
             </template>
-            <p>查看系统使用情况和统计数据</p>
+            <p>创建、分配和管理任务</p>
             <template #footer>
-              <Button label="数据统计" @click="viewStatistics" />
+              <Button label="任务管理" @click="manageTasks" />
+            </template>
+          </Card>
+          
+          <Card class="manage-card" hoverable>
+            <template #header>
+              <div class="card-icon">🎯</div>
+              <h3>能力管理</h3>
+            </template>
+            <p>查看和管理用户能力点</p>
+            <template #footer>
+              <Button label="能力管理" @click="manageAbilities" />
+            </template>
+          </Card>
+          
+          <Card class="manage-card" hoverable>
+            <template #header>
+              <div class="card-icon">👨‍🏫</div>
+              <h3>师生管理</h3>
+            </template>
+            <p>管理师生关系和匹配</p>
+            <template #footer>
+              <Button label="师生管理" @click="manageRelations" />
             </template>
           </Card>
           
@@ -160,6 +184,8 @@ const examinerButtonDisabled = ref(false)
 const enterpriseButtonCooldown = ref(0)
 const examinerButtonCooldown = ref(0)
 const showUserInfoModal = ref(false)
+
+
 
 // 滚动到密钥生成区域
 const scrollToKeySection = () => {
@@ -304,12 +330,24 @@ const manageUsers = () => {
   showUserManagementModal.value = true
 }
 
-const viewStatistics = () => {
-  alert('查看数据统计功能')
+
+
+
+
+const manageTasks = () => {
+  router.push('/admin/tasks')
+}
+
+const manageAbilities = () => {
+  router.push('/admin/abilities')
+}
+
+const manageRelations = () => {
+  router.push('/admin/relations')
 }
 
 const securitySettings = () => {
-  alert('进入安全设置功能')
+  router.push('/admin/security')
 }
 
 // 自动清除消息
@@ -421,13 +459,109 @@ onMounted(() => {
   border: 1px solid #e9ecef;
 }
 
+/* 统计卡片样式 */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.stat-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 8px 32px rgba(102, 126, 234, 0.2);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(102, 126, 234, 0.3);
+}
+
+.stat-icon {
+  font-size: 2.5rem;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.stat-content {
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.stat-label {
+  font-size: 1rem;
+  opacity: 0.9;
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+.stat-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.stat-breakdown span {
+  display: flex;
+  justify-content: space-between;
+}
+
+/* 不同统计卡片颜色变体 */
+.stat-card:nth-child(2) {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.stat-card:nth-child(3) {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.stat-card:nth-child(4) {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+}
+
 @media (max-width: 768px) {
   .grid {
     grid-template-columns: 1fr;
   }
   
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
   .section-title {
     font-size: 1.5rem;
+  }
+  
+  .stat-card {
+    padding: 20px;
+  }
+  
+  .stat-value {
+    font-size: 2rem;
   }
 }
 </style>

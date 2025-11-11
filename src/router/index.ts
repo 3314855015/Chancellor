@@ -44,6 +44,38 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/audit-logs',
+    name: 'AdminAuditLogs',
+    component: () => import('@/views/AdminAuditLogs.vue'),
+    meta: {
+      title: '审计日志'
+    }
+  },
+  {
+    path: '/admin/abilities',
+    name: 'AdminAbilities',
+    component: () => import('@/views/AdminAbilities.vue'),
+    meta: {
+      title: '能力管理'
+    }
+  },
+  {
+    path: '/admin/relations',
+    name: 'AdminRelations',
+    component: () => import('@/views/AdminRelations.vue'),
+    meta: {
+      title: '师生管理'
+    }
+  },
+  {
+    path: '/admin/tasks',
+    name: 'AdminTasks',
+    component: () => import('@/views/AdminTasks.vue'),
+    meta: {
+      title: '任务管理'
+    }
+  },
+  {
     path: '/examiner',
     name: 'Examiner',
     component: () => import('@/views/ExaminerPage.vue'),
