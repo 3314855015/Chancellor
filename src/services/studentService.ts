@@ -86,7 +86,7 @@ export const getStudentInfo = async (): Promise<{
     // 首先检查Supabase认证状态，如果没有认证则设置认证
     const { data: sessionData } = await supabase.auth.getSession()
     if (!sessionData.session) {
-      console.warn('Supabase会话未认证，尝试设置认证')
+      // console.warn('Supabase会话未认证，尝试设置认证')
       
       // 获取当前用户的认证token
       const token = authService.getToken()
@@ -98,7 +98,7 @@ export const getStudentInfo = async (): Promise<{
         })
         
         if (signInError) {
-          console.warn('设置Supabase会话失败:', signInError)
+          // console.warn('设置Supabase会话失败:', signInError)
           // 使用自定义认证方式获取学生信息
           return await getStudentInfoWithCustomAuth(currentUser)
         }
@@ -212,7 +212,7 @@ export const getStudentTeacher = async (): Promise<{
     // 首先检查Supabase认证状态，但不直接返回，继续尝试获取教师信息
     const { data: sessionData } = await supabase.auth.getSession()
     if (!sessionData.session) {
-      console.warn('Supabase会话未认证，尝试使用自定义认证方式获取教师信息')
+      // console.warn('Supabase会话未认证，尝试使用自定义认证方式获取教师信息')
       // 不直接返回，继续尝试获取教师信息
     }
 
@@ -398,7 +398,7 @@ export const getStudentTasks = async (status?: 'available' | 'accepted' | 'compl
     // 首先检查Supabase认证状态，如果没有认证则设置认证
     const { data: sessionData } = await supabase.auth.getSession()
     if (!sessionData.session) {
-      console.warn('Supabase会话未认证，尝试设置认证')
+      // console.warn('Supabase会话未认证，尝试设置认证')
       
       // 获取当前用户的认证token
       const token = authService.getToken()
@@ -410,7 +410,7 @@ export const getStudentTasks = async (status?: 'available' | 'accepted' | 'compl
         })
         
         if (signInError) {
-          console.warn('设置Supabase会话失败:', signInError)
+          // console.warn('设置Supabase会话失败:', signInError)
           // 使用自定义认证方式获取任务
           return await getStudentTasksWithCustomAuth(currentUser, status)
         }
@@ -1301,7 +1301,7 @@ export const getStudentActualAbilities = async (): Promise<{
       if (abilityRecordsData && abilityRecordsData.success && abilityRecordsData.data) {
         // 使用新的RPC函数返回的general点数
         actualGeneralPoints = abilityRecordsData.data.general_points || 0;
-        console.log('使用新的RPC函数获取的general点数:', actualGeneralPoints);
+        // console.log('使用新的RPC函数获取的general点数:', actualGeneralPoints);
       } else if (abilityRecordsError) {
         console.warn('获取ability records失败，使用默认值:', abilityRecordsError);
       }
@@ -1379,13 +1379,13 @@ export const getStudentActualAbilities = async (): Promise<{
       const remainingBasePoints = Math.max(0, 10 - baseTotal);
       const remainingTotalPoints = Math.max(0, 10 + actualGeneralPoints - (baseTotal + tempTotal));
       
-      console.log('修正后的剩余点数计算:', {
-        baseTotal,
-        tempTotal,
-        actualGeneralPoints,
-        remainingBasePoints,
-        remainingTotalPoints
-      })
+      // console.log('修正后的剩余点数计算:', {
+      //   baseTotal,
+      //   tempTotal,
+      //   actualGeneralPoints,
+      //   remainingBasePoints,
+      //   remainingTotalPoints
+      // })
       
       return {
         success: true,

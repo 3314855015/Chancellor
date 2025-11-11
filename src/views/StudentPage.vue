@@ -502,13 +502,13 @@ const showUserInfoModal = ref(false)
 
 // 能力数据
 const abilities = ref([
-  { name: '前端开发', icon: '💻', value: 0 },
-  { name: '安卓开发', icon: '📱', value: 0 },
-  { name: '后端开发', icon: '⚙️', value: 0 },
-  { name: '人工智能', icon: '🤖', value: 0 },
-  { name: '沟通能力', icon: '💬', value: 0 },
-  { name: '创造力', icon: '💡', value: 0 },
-  { name: '领导力', icon: '👑', value: 0 }
+  { name: '前端开发', icon: '💻', value: 0, tempValue: 0, totalValue: 0 },
+  { name: '安卓开发', icon: '📱', value: 0, tempValue: 0, totalValue: 0 },
+  { name: '后端开发', icon: '⚙️', value: 0, tempValue: 0, totalValue: 0 },
+  { name: '人工智能', icon: '🤖', value: 0, tempValue: 0, totalValue: 0 },
+  { name: '沟通能力', icon: '💬', value: 0, tempValue: 0, totalValue: 0 },
+  { name: '创造力', icon: '💡', value: 0, tempValue: 0, totalValue: 0 },
+  { name: '领导力', icon: '👑', value: 0, tempValue: 0, totalValue: 0 }
 ])
 
 // 任务数据
@@ -695,7 +695,13 @@ const loadStudentAbilities = async () => {
     // 使用新的RPC函数获取学生实际能力数据（包含基础值和临时值）
     const response = await studentService.getStudentActualAbilities()
     if (response.success) {
-      abilities.value = response.data.abilities
+      // 确保返回的能力数据包含必需的属性
+      abilities.value = response.data.abilities.map((ability: any) => ({
+        ...ability,
+        tempValue: ability.tempValue || 0,
+        // 强制重新计算总值，确保正确计算基础值+临时值
+        totalValue: (ability.value || 0) + (ability.tempValue || 0)
+      }))
       
       // 更新学生总能力点数 - 使用总值（基础值+临时值）
       const totalPoints = abilities.value.reduce((sum, ability) => {
