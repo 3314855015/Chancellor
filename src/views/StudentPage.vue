@@ -4,6 +4,8 @@
       title="🎓 监生面板" 
       subtitle="接取任务 · 提升能力 · 寻求就业"
       @avatar-click="showUserInfoModal = true"
+      @promotion-click="showPromotionModal = true"
+      @invitation-click="showInvitationModal = true"
     />
     
     <StudentWelcome :student-status="studentInfo.status" />
@@ -452,6 +454,20 @@
       v-model:visible="showUserInfoModal"
       @close="showUserInfoModal = false"
     />
+
+    <!-- 升官模态框 -->
+    <PromotionModal 
+      v-model:visible="showPromotionModal"
+      @close="showPromotionModal = false"
+      @success="handlePromotionSuccess"
+    />
+
+    <!-- 接受邀约模态框 -->
+    <InvitationModal 
+      v-model:visible="showInvitationModal"
+      @close="showInvitationModal = false"
+      @success="handleInvitationSuccess"
+    />
   </div>
 </template>
 
@@ -464,6 +480,8 @@ import Footer from '@/components/Footer.vue'
 import StudentWelcome from '@/components/Welcome/StudentWelcome.vue'
 import Modal from '@/components/Modals/BaseModal.vue'
 import UserInfoModal from '@/components/Modals/UserInfoModal.vue'
+import PromotionModal from '@/components/Modals/PromotionModal.vue'
+import InvitationModal from '@/components/Modals/InvitationModal.vue'
 import studentService from '@/services/studentService'
 
 // 响应式数据
@@ -499,6 +517,24 @@ const studentTeacher = ref<any>(null)
 
 // 用户信息模态框
 const showUserInfoModal = ref(false)
+
+// 升官模态框
+const showPromotionModal = ref(false)
+
+// 接受邀约模态框
+const showInvitationModal = ref(false)
+
+// 处理升官成功
+const handlePromotionSuccess = () => {
+  // 身份升级成功，跳转到主页面（下次登录会直接进入对应角色页面）
+  window.location.href = '/'
+}
+
+// 处理接受邀约成功
+const handleInvitationSuccess = () => {
+  // 身份升级成功，跳转到主页面（下次登录会直接进入对应角色页面）
+  window.location.href = '/'
+}
 
 // 能力数据
 const abilities = ref([
@@ -756,8 +792,15 @@ const bindTeacher = async () => {
       studentTeacher.value = response.data.teacher
       successMessage.value = '教师绑定成功！'
       teacherKeyInput.value = ''
-      // 重新加载教师信息
-      await loadStudentTeacher()
+      
+      // 绑定教师成功后立即重新加载所有相关数据
+      await Promise.all([
+        loadStudentInfo(),
+        loadStudentTeacher(),
+        loadStudentAbilities(),
+        loadStudentTasks(),
+        loadEmploymentOpportunities()
+      ])
     } else {
       throw new Error(response.message)
     }

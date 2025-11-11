@@ -11,39 +11,22 @@
       
       <!-- 按钮区域 - 右侧 -->
       <div class="action-section">
-        <button class="action-btn" @click="showPromotionModal">
+        <button class="action-btn" @click="$emit('promotion-click')">
           <span class="btn-icon">📈</span>
           <span class="btn-text">升官</span>
         </button>
-        <button class="action-btn" @click="showInvitationModal">
+        <button class="action-btn" @click="$emit('invitation-click')">
           <span class="btn-icon">📨</span>
           <span class="btn-text">接受邀约</span>
         </button>
         <Avatar @click="$emit('avatar-click')" />
       </div>
     </div>
-
-    <!-- 升官模态框 -->
-    <PromotionModal 
-      v-model:visible="showPromotion" 
-      @close="hidePromotionModal"
-      @success="handlePromotionSuccess"
-    />
-
-    <!-- 接受邀约模态框 -->
-    <InvitationModal 
-      v-model:visible="showInvitation" 
-      @close="hideInvitationModal"
-      @success="handleInvitationSuccess"
-    />
   </header>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
 import Avatar from '@/components/UI/Avatar.vue'
-import PromotionModal from '@/components/Modals/PromotionModal.vue'
-import InvitationModal from '@/components/Modals/InvitationModal.vue'
 
 interface Props {
   title: string
@@ -52,39 +35,12 @@ interface Props {
 
 interface Emits {
   (e: 'avatar-click'): void
+  (e: 'promotion-click'): void
+  (e: 'invitation-click'): void
 }
 
 defineProps<Props>()
 defineEmits<Emits>()
-
-const showPromotion = ref(false)
-const showInvitation = ref(false)
-
-const showPromotionModal = () => {
-  showPromotion.value = true
-}
-
-const hidePromotionModal = () => {
-  showPromotion.value = false
-}
-
-const showInvitationModal = () => {
-  showInvitation.value = true
-}
-
-const hideInvitationModal = () => {
-  showInvitation.value = false
-}
-
-const handlePromotionSuccess = () => {
-  // 身份升级成功，跳转到主页面（下次登录会直接进入对应角色页面）
-  window.location.href = '/'
-}
-
-const handleInvitationSuccess = () => {
-  // 身份升级成功，跳转到主页面（下次登录会直接进入对应角色页面）
-  window.location.href = '/'
-}
 </script>
 
 <style scoped>

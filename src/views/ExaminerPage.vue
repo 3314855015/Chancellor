@@ -4,6 +4,7 @@
       title="📚 考官面板" 
       subtitle="发布任务 · 评审学生 · 分配点数"
       @avatar-click="showUserInfoModal = true"
+      @recruitment-click="showRecruitmentModal = true"
     />
     
     <ExaminerWelcome @generateTeacherKey="generateTeacherKey" />
@@ -313,6 +314,12 @@
       v-model:visible="showUserInfoModal" 
       @close="showUserInfoModal = false"
     />
+
+    <!-- 招生模态框 -->
+    <RecruitmentModal 
+      v-model:visible="showRecruitmentModal" 
+      @close="showRecruitmentModal = false"
+    />
   </div>
 </template>
 
@@ -325,6 +332,7 @@ import Button from '@/components/Button.vue'
 import Footer from '@/components/Footer.vue'
 import ExaminerWelcome from '@/components/Welcome/ExaminerWelcome.vue'
 import UserInfoModal from '@/components/Modals/UserInfoModal.vue'
+import RecruitmentModal from '@/components/Modals/RecruitmentModal.vue'
 import examinerService from '@/services/examinerService'
 import authService from '@/services/authService'
 import { supabase } from '@/lib/supabase.client'
@@ -335,6 +343,7 @@ const showAssignAbilityModal = ref(false)
 const showConfirmDialog = ref(false)
 const showTeacherKeyModal = ref(false)
 const showUserInfoModal = ref(false)
+const showRecruitmentModal = ref(false)
 const teacherKey = ref<any>(null)
 const loading = ref(false)
 const errorMessage = ref('')

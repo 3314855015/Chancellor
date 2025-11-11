@@ -11,26 +11,18 @@
       
       <!-- 按钮区域 - 右侧 -->
       <div class="action-section">
-        <button class="action-btn" @click="showRecruitmentModal">
+        <button class="action-btn" @click="$emit('recruitment-click')">
           <span class="btn-icon">👥</span>
           <span class="btn-text">招生</span>
         </button>
         <Avatar @click="$emit('avatar-click')" />
       </div>
     </div>
-
-    <!-- 招生模态框 -->
-    <RecruitmentModal 
-      v-model:visible="showRecruitment" 
-      @close="hideRecruitmentModal"
-    />
   </header>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
 import Avatar from '@/components/UI/Avatar.vue'
-import RecruitmentModal from '@/components/Modals/RecruitmentModal.vue'
 
 interface Props {
   title: string
@@ -39,20 +31,11 @@ interface Props {
 
 interface Emits {
   (e: 'avatar-click'): void
+  (e: 'recruitment-click'): void
 }
 
 defineProps<Props>()
 defineEmits<Emits>()
-
-const showRecruitment = ref(false)
-
-const showRecruitmentModal = () => {
-  showRecruitment.value = true
-}
-
-const hideRecruitmentModal = () => {
-  showRecruitment.value = false
-}
 </script>
 
 <style scoped>
